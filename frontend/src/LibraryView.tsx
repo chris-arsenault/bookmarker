@@ -5,6 +5,8 @@ import { LibraryFeed } from "./LibraryFeed";
 import { createLibraryViewModel, type LibraryState, type LibraryViewModel } from "./libraryState";
 import { platformOptions, tagOptions, type LibraryFilters } from "./libraryFilters";
 import { TagManager } from "./TagManager";
+import { AppBar, VaultRail } from "./VaultChrome";
+import { config } from "./config";
 import type {
   LibraryItemDetail,
   LibraryItemSummary,
@@ -61,48 +63,63 @@ function ReadyLibraryView({
   onMergeTags,
 }: ReadyLibraryViewProps) {
   return (
-    <main className="app-shell">
-      {onCreateText && onCreateLink ? (
-        <CaptureWorkspace
-          onCreateLink={onCreateLink}
-          onCreateText={onCreateText}
-          tags={viewModel.tags}
-        />
-      ) : null}
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Bookmarker</p>
-          <h1>Vault</h1>
-        </div>
-        <p className="summary-line">
-          {viewModel.items.length} saved · {activeFilterCount(filters)} active filters
-        </p>
-      </header>
-      <FilterBar
+    <div className="vault">
+      <VaultRail
         filters={filters}
-        platforms={platformOptions(viewModel.items)}
-        tags={tagOptions(viewModel.tags)}
+        itemCount={viewModel.items.length}
         onFiltersChange={onFiltersChange}
+        tagCount={viewModel.tags.length}
       />
-      <TagManager tags={viewModel.tags} onMergeTags={onMergeTags} onRenameTag={onRenameTag} />
-      <section className="library-layout">
-        <LibraryFeed
-          items={viewModel.items}
-          selectedItemId={viewModel.selectedItem?.id ?? null}
-          thumbnailUrls={thumbnailUrls}
-          onCopyItem={onCopyLink}
-          onSelectItem={onSelectItem}
+      <main className="workspace">
+        <AppBar
+          activeFilters={activeFilterCount(filters)}
+          filters={filters}
+          savedCount={viewModel.items.length}
         />
-        <ItemDetail
-          availableTags={viewModel.tags}
-          detail={viewModel.selectedDetail}
-          onCopyLink={onCopyLink}
-          onDeleteItem={onDeleteItem}
-          onOpenSource={onOpenSource}
-          onUpdateItem={onUpdateItem}
-        />
-      </section>
-    </main>
+        <div className="workspace-body">
+          <div className="primary-column">
+            {onCreateText && onCreateLink ? (
+              <CaptureWorkspace
+                onCreateLink={onCreateLink}
+                onCreateText={onCreateText}
+                tags={viewModel.tags}
+              />
+            ) : null}
+            <FilterBar
+              filters={filters}
+              platforms={platformOptions(viewModel.items)}
+              tags={tagOptions(viewModel.tags)}
+              onFiltersChange={onFiltersChange}
+            />
+            <div className="feed-scroll">
+              <LibraryFeed
+                items={viewModel.items}
+                selectedItemId={viewModel.selectedItem?.id ?? null}
+                thumbnailUrls={thumbnailUrls}
+                onCopyItem={onCopyLink}
+                onSelectItem={onSelectItem}
+              />
+              <details className="corpus">
+                <summary>Tag corpus</summary>
+                <TagManager
+                  tags={viewModel.tags}
+                  onMergeTags={onMergeTags}
+                  onRenameTag={onRenameTag}
+                />
+              </details>
+            </div>
+          </div>
+          <ItemDetail
+            availableTags={viewModel.tags}
+            detail={viewModel.selectedDetail}
+            onCopyLink={onCopyLink}
+            onDeleteItem={onDeleteItem}
+            onOpenSource={onOpenSource}
+            onUpdateItem={onUpdateItem}
+          />
+        </div>
+      </main>
+    </div>
   );
 }
 
@@ -110,7 +127,7 @@ function InactiveLibraryView({ status, message }: { status: string; message: str
   return (
     <main className="app-shell app-shell-centered">
       <section className="empty-state">
-        <p className="eyebrow">Linkdrop</p>
+        <p className="eyebrow">{config.productName}</p>
         <h1>{status === "signed-out" ? "Sign in" : "Vault"}</h1>
         <p>{message ?? inactiveMessage(status)}</p>
       </section>

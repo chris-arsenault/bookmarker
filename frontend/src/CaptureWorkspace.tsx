@@ -83,7 +83,7 @@ function CaptureHeader({
   return (
     <div className="capture-header">
       <div>
-        <p className="eyebrow">Bookmarker</p>
+        <p className="eyebrow">Quick capture</p>
         <h1>New item</h1>
       </div>
       <div className="capture-mode-switch" aria-label="Capture mode">
