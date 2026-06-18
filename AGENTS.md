@@ -27,6 +27,7 @@ Bookmarker is an Ahara-integrated personal capture vault with a Rust API, React 
 - Keep Android as a native client under `android/`; it consumes the same authenticated API as the web frontend and can capture URL or text share payloads.
 - Never start local development servers unless the user explicitly asks.
 - Run `make ci` before handoff after changing files.
+- Do not wrap normal Git remote operations in `with-cred`. `git fetch`, `git pull`, and `git push` use the configured SSH remote/agent directly. Use the secret broker only for commands that need injected runtime secrets such as AWS, Cognito, database, live API, or smoke-test credentials.
 
 ## Code map
 

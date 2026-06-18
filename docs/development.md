@@ -57,6 +57,9 @@ with-cred -- scripts/deploy.sh
 with-cred -- scripts/smoke.sh
 ```
 
+Do not wrap normal Git remote operations in `with-cred`. `git fetch`,
+`git pull`, and `git push` use the configured SSH remote/agent directly.
+
 `scripts/deploy.sh` is parameterless. It builds Rust Lambda release artifacts
 with `cargo lambda build --release`, builds the frontend, runs `db-migrate`,
 applies Terraform against the shared Ahara state bucket, and prints the
