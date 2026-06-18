@@ -1,0 +1,50 @@
+# Android
+
+Native Android client for Bookmarker quick-drop capture.
+
+The app registers an `ACTION_SEND` text/plain share target. Shared text is
+parsed for the first HTTP(S) URL; if no URL is present, non-empty shared text is
+captured as a text snippet. The user can drop either payload immediately with no
+required fields. The share screen loads the authenticated `GET /tags` corpus
+when available, renders most-used tags as optional chips, accepts a free-text
+tag, and sends only selected or typed explicit tags.
+
+The Android app signs in directly against the shared Ahara Cognito pool through
+the Linkdrop public app client. It supports the platform software-token MFA
+contract: existing users can answer `SOFTWARE_TOKEN_MFA`, and users who need
+enrollment can complete `MFA_SETUP` from the one-time setup key before capture.
+The stored refresh token is used to refresh access tokens before API calls.
+
+URL capture calls `POST /items`; text capture calls `POST /items/text`. Both
+send selected explicit tags and a stable `client_capture_id` for the share
+attempt. The API client requires a fresh bearer token from the local auth
+boundary before making capture or tag corpus requests.
+
+`make ci` runs both `android-structure-check` and a Gradle `:app:assembleDebug`
+compile through the checked-in wrapper. Set `ANDROID_HOME` or `ANDROID_SDK_ROOT`
+to an SDK that has platform `android-36`, or install the SDK under
+`$HOME/android-sdk`.
+
+APK outputs use product-specific names:
+
+| Variant | Path |
+| ---- | ---- |
+| Debug | `android/app/build/outputs/apk/debug/linkdrop-debug-v0.1.0-1.apk` |
+| Release | `android/app/build/outputs/apk/release/linkdrop-release-unsigned-v0.1.0-1.apk` |
+
+Run `make android-release-build` for the release variant. The current release
+artifact is unsigned because no Linkdrop release keystore is configured.
+
+Use the guarded scripts for signing and device installs:
+
+```bash
+make android-create-release-keystore
+make android-sign-release
+make android-install-debug
+make android-install-release
+```
+
+The signing script writes
+`android/app/build/outputs/apk/release/linkdrop-release-signed-v0.1.0-1.apk`.
+It never stores the keystore password in the repo. Back up the keystore and
+password; Android requires the same signing key for future upgrades.

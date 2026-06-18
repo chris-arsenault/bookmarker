@@ -1,0 +1,11 @@
+project: linkdrop
+prefix: linkdrop
+migrations: db/migrations
+stack:
+  - rust
+  - typescript
+  - terraform
+rust_artifacts:
+  lambdas:
+    - api
+    - processing

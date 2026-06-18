@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS processing_jobs;
+DROP TABLE IF EXISTS metadata_snapshots;
+DROP TABLE IF EXISTS item_notes;
+DROP TRIGGER IF EXISTS item_tags_usage_delete ON item_tags;
+DROP TRIGGER IF EXISTS item_tags_usage_insert ON item_tags;
+DROP FUNCTION IF EXISTS update_tag_usage_counts();
+DROP TABLE IF EXISTS tag_usage_counts;
+DROP TABLE IF EXISTS item_tags;
+DROP TABLE IF EXISTS tags;
+DROP TABLE IF EXISTS item_urls;
+DROP TABLE IF EXISTS items;
+DROP TABLE IF EXISTS users;

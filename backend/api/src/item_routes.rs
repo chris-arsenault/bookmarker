@@ -1,0 +1,204 @@
+use axum::extract::{Path, Query, State};
+use axum::http::{header, HeaderMap, StatusCode};
+use axum::response::{IntoResponse, Response};
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use serde::Deserialize;
+use shared::domain::{ArchiveStatus, InboxStatus, WatchStatus};
+use shared::library::{
+    CaptureItemOutcome, CaptureItemRequest, CaptureTextRequest, LibraryItemDetail,
+    LibraryItemSummary, ListItemsQuery, UpdateItemRequest,
+};
+use time::format_description::well_known::Rfc3339;
+use time::OffsetDateTime;
+use uuid::Uuid;
+
+use crate::{require_user, ApiError, ApiState};
+
+pub fn router() -> Router<ApiState> {
+    Router::new()
+        .route("/items", get(list_items).post(capture_item))
+        .route("/items/text", post(capture_text))
+        .route("/items/{item_id}/thumbnail", get(get_item_thumbnail))
+        .route(
+            "/items/{item_id}",
+            get(get_item).patch(update_item).delete(delete_item),
+        )
+}
+
+async fn capture_text(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Json(request): Json<CaptureTextRequest>,
+) -> Result<(StatusCode, Json<CaptureItemOutcome>), ApiError> {
+    let user = require_user(&state, &headers).await?;
+    let outcome = state.library.capture_text(&user, request).await?;
+    let status = if outcome.created {
+        StatusCode::CREATED
+    } else {
+        StatusCode::OK
+    };
+    Ok((status, Json(outcome)))
+}
+
+async fn capture_item(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Json(request): Json<CaptureItemRequest>,
+) -> Result<(StatusCode, Json<CaptureItemOutcome>), ApiError> {
+    let user = require_user(&state, &headers).await?;
+    let outcome = state.library.capture_item(&user, request).await?;
+    let status = if outcome.created {
+        StatusCode::CREATED
+    } else {
+        StatusCode::OK
+    };
+    dispatch_processing(&state, outcome.item.summary.id).await;
+    Ok((status, Json(outcome)))
+}
+
+async fn dispatch_processing(state: &ApiState, item_id: Uuid) {
+    if let Err(err) = state.processing_dispatcher.dispatch_item(item_id).await {
+        tracing::warn!(
+            item_id = %item_id,
+            error = %err,
+            "failed to dispatch processing"
+        );
+    }
+}
+
+async fn list_items(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Query(params): Query<ListItemsParams>,
+) -> Result<Json<Vec<LibraryItemSummary>>, ApiError> {
+    let user = require_user(&state, &headers).await?;
+    let query = params.into_query()?;
+    Ok(Json(state.library.list_items(&user, &query).await?))
+}
+
+async fn get_item(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Path(item_id): Path<Uuid>,
+) -> Result<Json<LibraryItemDetail>, ApiError> {
+    let user = require_user(&state, &headers).await?;
+    Ok(Json(state.library.get_item(&user, item_id).await?))
+}
+
+async fn get_item_thumbnail(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Path(item_id): Path<Uuid>,
+) -> Result<Response, ApiError> {
+    let user = require_user(&state, &headers).await?;
+    let item = state.library.get_item(&user, item_id).await?;
+    let key = item.summary.thumbnail_s3_key.ok_or_else(|| {
+        shared::error::AppError::NotFound(format!("thumbnail for item {item_id}"))
+    })?;
+    let object = state.thumbnail_reader.read_thumbnail(&key).await?;
+    Ok(([(header::CONTENT_TYPE, object.content_type)], object.bytes).into_response())
+}
+
+async fn update_item(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Path(item_id): Path<Uuid>,
+    Json(request): Json<UpdateItemRequest>,
+) -> Result<Json<LibraryItemDetail>, ApiError> {
+    if empty_update_request(&request) {
+        return Err(validation_error("organization update must include at least one field").into());
+    }
+    let user = require_user(&state, &headers).await?;
+    Ok(Json(
+        state.library.update_item(&user, item_id, request).await?,
+    ))
+}
+
+async fn delete_item(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Path(item_id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    let user = require_user(&state, &headers).await?;
+    state.library.delete_item(&user, item_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct ListItemsParams {
+    platform: Option<String>,
+    tag: Option<String>,
+    created_from: Option<String>,
+    created_to: Option<String>,
+    archive_status: Option<String>,
+    watch_status: Option<String>,
+    inbox_status: Option<String>,
+    q: Option<String>,
+}
+
+impl ListItemsParams {
+    fn into_query(self) -> Result<ListItemsQuery, ApiError> {
+        Ok(ListItemsQuery {
+            platform: clean_param(self.platform),
+            tag: clean_param(self.tag),
+            created_from: parse_datetime_param("created_from", self.created_from)?,
+            created_to: parse_datetime_param("created_to", self.created_to)?,
+            archive_status: parse_archive_status(self.archive_status)?,
+            watch_status: parse_watch_status(self.watch_status)?,
+            inbox_status: parse_inbox_status(self.inbox_status)?,
+            q: clean_param(self.q),
+        })
+    }
+}
+
+fn parse_archive_status(value: Option<String>) -> Result<Option<ArchiveStatus>, ApiError> {
+    clean_param(value)
+        .map(|value| ArchiveStatus::try_from(value.as_str()).map_err(validation_error))
+        .transpose()
+        .map_err(Into::into)
+}
+
+fn parse_watch_status(value: Option<String>) -> Result<Option<WatchStatus>, ApiError> {
+    clean_param(value)
+        .map(|value| WatchStatus::try_from(value.as_str()).map_err(validation_error))
+        .transpose()
+        .map_err(Into::into)
+}
+
+fn parse_inbox_status(value: Option<String>) -> Result<Option<InboxStatus>, ApiError> {
+    clean_param(value)
+        .map(|value| InboxStatus::try_from(value.as_str()).map_err(validation_error))
+        .transpose()
+        .map_err(Into::into)
+}
+
+fn parse_datetime_param(
+    name: &'static str,
+    value: Option<String>,
+) -> Result<Option<OffsetDateTime>, ApiError> {
+    clean_param(value)
+        .map(|value| {
+            OffsetDateTime::parse(&value, &Rfc3339)
+                .map_err(|_| shared::error::AppError::Validation(format!("{name} must be RFC3339")))
+        })
+        .transpose()
+        .map_err(Into::into)
+}
+
+fn empty_update_request(request: &UpdateItemRequest) -> bool {
+    request.watch_status.is_none()
+        && request.inbox_status.is_none()
+        && request.notes.is_none()
+        && request.tags.is_none()
+}
+
+fn clean_param(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn validation_error(err: impl ToString) -> shared::error::AppError {
+    shared::error::AppError::Validation(err.to_string())
+}

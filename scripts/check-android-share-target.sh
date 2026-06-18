@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ANDROID_DIR="${ROOT_DIR}/android/app/src/main"
+JAVA_DIR="${ANDROID_DIR}/java/io/ahara/linkdrop"
+MANIFEST="${ANDROID_DIR}/AndroidManifest.xml"
+
+rg 'android.intent.action.SEND' "${MANIFEST}" >/dev/null
+rg 'android:mimeType="text/plain"' "${MANIFEST}" >/dev/null
+rg 'android:name=".share.ShareActivity"' "${MANIFEST}" >/dev/null
+
+rg 'interface AuthRepository|class StoredTokenAuthRepository' "${JAVA_DIR}/auth" >/dev/null
+rg 'class AuthTokenStore' "${JAVA_DIR}/auth" >/dev/null
+rg 'class CognitoAuthClient' "${JAVA_DIR}/auth" >/dev/null
+rg 'SOFTWARE_TOKEN_MFA|MFA_SETUP|REFRESH_TOKEN_AUTH' "${JAVA_DIR}/auth/CognitoAuthClient.kt" >/dev/null
+rg 'Authorization", "Bearer' "${JAVA_DIR}/api/LinkdropApiClient.kt" >/dev/null
+
+rg 'class LinkdropApiClient' "${JAVA_DIR}/api" >/dev/null
+rg 'client_capture_id' "${JAVA_DIR}/api" >/dev/null
+rg '"/items"|"/tags"' "${JAVA_DIR}/api" >/dev/null
+
+rg 'ShareIntentParser' "${JAVA_DIR}/share" >/dev/null
+rg 'ShareTagState' "${JAVA_DIR}/share" >/dev/null
+rg 'TagChipRow' "${JAVA_DIR}/share" >/dev/null
+rg 'listTags' "${JAVA_DIR}/share" >/dev/null
+rg 'selectedTagValues' "${JAVA_DIR}/share" >/dev/null
+
+if rg 'generated tag|inferred tag|auto-generated|auto generated|suggested tag' "${JAVA_DIR}" >/dev/null; then
+    echo "Android share flow must not generate or infer tags" >&2
+    exit 1
+fi

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bookmarker</string>
+    <string name="auth_username">Username</string>
+    <string name="auth_password">Password</string>
+    <string name="auth_sign_in">Sign in</string>
+    <string name="auth_sign_out">Sign out</string>
+    <string name="auth_signed_in">Ready to capture</string>
+    <string name="auth_signed_out">Sign in required</string>
+    <string name="auth_code">Authenticator code</string>
+    <string name="auth_verify_code">Verify code</string>
+    <string name="auth_setup_prompt">Add this setup key to your authenticator app, then enter a 6-digit code.</string>
+    <string name="auth_setup_uri">Authenticator setup URI</string>
+    <string name="auth_failed">Authentication failed</string>
+    <string name="share_missing_url">No link found</string>
+    <string name="share_missing_payload">No link or text found</string>
+    <string name="share_drop">Drop</string>
+    <string name="share_cancel">Cancel</string>
+    <string name="share_saved">Saved to Bookmarker</string>
+    <string name="share_failed">Could not save item</string>
+    <string name="share_sign_in_required">Sign in to Bookmarker first</string>
+</resources>
