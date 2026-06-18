@@ -2,6 +2,7 @@ export type DesktopBridge = {
   readClipboardText: () => Promise<string>;
   writeClipboardText: (value: string) => Promise<void>;
   platform: () => Promise<string>;
+  credentialPath: () => Promise<string>;
   credentialGet: (key: string) => string | null;
   credentialSet: (key: string, value: string) => void;
   credentialRemove: (key: string) => void;

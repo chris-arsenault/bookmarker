@@ -87,6 +87,7 @@ impl LibraryService for InMemoryLibraryService {
     ) -> AppResult<CaptureItemOutcome> {
         let CaptureItemRequest {
             url,
+            title,
             tags,
             client_capture_id,
         } = request;
@@ -115,6 +116,7 @@ impl LibraryService for InMemoryLibraryService {
         let item = self.new_capture_item(
             original_url,
             normalized_url,
+            clean_optional(title),
             tag_ops::capture_tags(&self.tags_by_user, &user.sub, &tags)?,
         );
         self.store_capture(user, client_capture_id, item.clone());
@@ -281,6 +283,7 @@ impl InMemoryLibraryService {
         &self,
         original_url: String,
         normalized_url: NormalizedUrl,
+        title: Option<String>,
         tags: Vec<ItemTag>,
     ) -> LibraryItemDetail {
         let NormalizedUrl { canonical_url, .. } = normalized_url;
@@ -290,7 +293,7 @@ impl InMemoryLibraryService {
                 item_kind: ItemKind::Url,
                 url: Some(ItemUrlSummary::new(original_url, canonical_url)),
                 text: None,
-                title: None,
+                title,
                 thumbnail_s3_key: None,
                 author: None,
                 platform: None,
@@ -359,6 +362,12 @@ fn validate_client_capture_id(value: Option<String>) -> AppResult<Option<String>
 
 fn validation_error(err: impl ToString) -> AppError {
     AppError::Validation(err.to_string())
+}
+
+fn clean_optional(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn not_found(item_id: Uuid) -> AppError {

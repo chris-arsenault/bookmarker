@@ -29,6 +29,7 @@ async fn pg_capture_persists_original_and_canonical_url() {
             &user(),
             CaptureItemRequest {
                 url: "https://youtu.be/video-id?utm_source=share".to_string(),
+                title: None,
                 tags: Vec::new(),
                 client_capture_id: Some("share-attempt-1".to_string()),
             },
@@ -63,6 +64,7 @@ async fn pg_capture_persists_original_and_canonical_url() {
             &user(),
             CaptureItemRequest {
                 url: "https://example.com/different".to_string(),
+                title: None,
                 tags: Vec::new(),
                 client_capture_id: Some("share-attempt-1".to_string()),
             },
@@ -85,14 +87,7 @@ async fn pg_capture_persists_original_and_canonical_url() {
             .and_then(|url| url.canonical_url.as_deref()),
         Some("https://www.youtube.com/watch?v=video-id")
     );
-    assert_eq!(
-        service
-            .list_items(&user(), &ListItemsQuery::default())
-            .await
-            .unwrap()
-            .len(),
-        1
-    );
+    assert_eq!(item_count(&service).await, 1);
     assert_eq!(count_rows(&pool, "metadata_snapshots").await, 0);
     assert_eq!(count_rows(&pool, "processing_jobs").await, 0);
 }
@@ -111,6 +106,7 @@ async fn pg_capture_applies_only_explicit_tags_and_updates_corpus() {
             &user(),
             CaptureItemRequest {
                 url: "https://example.com/one".to_string(),
+                title: None,
                 tags: vec![
                     " Learning ".to_string(),
                     "Videos".to_string(),
@@ -131,6 +127,7 @@ async fn pg_capture_applies_only_explicit_tags_and_updates_corpus() {
             &user(),
             CaptureItemRequest {
                 url: "https://example.com/two".to_string(),
+                title: None,
                 tags: vec!["videos".to_string()],
                 client_capture_id: Some("share-attempt-tags-2".to_string()),
             },
@@ -263,6 +260,7 @@ async fn capture_url(
             &user(),
             CaptureItemRequest {
                 url: url.to_string(),
+                title: None,
                 tags: tags.iter().map(|tag| (*tag).to_string()).collect(),
                 client_capture_id: Some(client_capture_id.to_string()),
             },

@@ -80,6 +80,8 @@ pub trait LibraryService: Send + Sync {
 pub struct CaptureItemRequest {
     pub url: String,
     #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
     pub tags: Vec<String>,
     pub client_capture_id: Option<String>,
 }

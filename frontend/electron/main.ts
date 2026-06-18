@@ -4,17 +4,20 @@ import { fileURLToPath } from "node:url";
 import { createDesktopCredentialStore } from "./credentialStore.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const productName = "Bookmarker";
 
 let mainWindow: BrowserWindow | null = null;
 let hudWindow: BrowserWindow | null = null;
 let activeTray: Tray | null = null;
 
+app.setName(productName);
+app.setPath("userData", path.join(app.getPath("appData"), productName));
 app.setAppUserModelId("io.ahara.bookmarker");
 
 app.whenReady().then(() => {
+  registerIpc();
   mainWindow = createMainWindow();
   activeTray = createTray();
-  registerIpc();
 });
 
 app.on("before-quit", () => {
@@ -131,6 +134,7 @@ function registerIpc() {
     clipboard.writeText(value);
   });
   ipcMain.handle("desktop:platform", () => process.platform);
+  ipcMain.handle("desktop:credential-path", () => credentialStore.path);
   ipcMain.on("desktop:credential-get", (event, key: string) => {
     event.returnValue = credentialStore.getItem(key);
   });

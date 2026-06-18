@@ -115,7 +115,7 @@ async function loadLibrary(
   setLibraryState: Dispatch<SetStateAction<LibraryState>>,
   setThumbnailUrls: (urls: Record<string, string>) => void
 ) {
-  setLibraryState({ status: "loading" });
+  setLibraryState((state) => (state.status === "ready" ? state : { status: "loading" }));
   try {
     const data = await loadLibraryData(apiClient, filters);
     setLibraryState(readyLibraryState(data.items, data.tags));
@@ -136,10 +136,11 @@ async function captureTextItem(
   setThumbnailUrls: (urls: Record<string, string>) => void
 ) {
   const outcome = await apiClient.captureText(request);
-  await refreshUnfilteredWithDetail(
+  setFilters({});
+  setLibraryState((state) => capturedDetailState(state, outcome.item));
+  await refreshUnfilteredWithDetailIfAvailable(
     apiClient,
     outcome.item,
-    setFilters,
     setLibraryState,
     setThumbnailUrls
   );
@@ -154,10 +155,11 @@ async function captureLinkItem(
   setThumbnailUrls: (urls: Record<string, string>) => void
 ) {
   const outcome = await apiClient.captureLink(request);
-  await refreshUnfilteredWithDetail(
+  setFilters({});
+  setLibraryState((state) => capturedDetailState(state, outcome.item));
+  await refreshUnfilteredWithDetailIfAvailable(
     apiClient,
     outcome.item,
-    setFilters,
     setLibraryState,
     setThumbnailUrls
   );
@@ -189,15 +191,28 @@ async function refreshLibraryWithDetail(
   setThumbnailUrls(data.thumbnailUrls);
 }
 
-async function refreshUnfilteredWithDetail(
+async function refreshUnfilteredWithDetailIfAvailable(
   apiClient: ApiClient,
   detail: LibraryItemDetail,
-  setFilters: Dispatch<SetStateAction<LibraryFilters>>,
   setLibraryState: Dispatch<SetStateAction<LibraryState>>,
   setThumbnailUrls: (urls: Record<string, string>) => void
 ) {
-  setFilters({});
-  await refreshLibraryWithDetail(apiClient, {}, detail, setLibraryState, setThumbnailUrls);
+  try {
+    await refreshLibraryWithDetail(apiClient, {}, detail, setLibraryState, setThumbnailUrls);
+  } catch {
+    setLibraryState((state) => capturedDetailState(state, detail));
+  }
+}
+
+function capturedDetailState(state: LibraryState, detail: LibraryItemDetail): LibraryState {
+  if (state.status !== "ready") {
+    return selectedLibraryState([detail.summary], [], detail);
+  }
+  return selectedLibraryState(capturedItems(state.items, detail.summary), state.tags, detail);
+}
+
+function capturedItems(items: LibraryItemSummary[], summary: LibraryItemSummary) {
+  return [summary, ...items.filter((item) => item.id !== summary.id)];
 }
 
 async function loadLibraryData(apiClient: ApiClient, filters: LibraryFilters) {

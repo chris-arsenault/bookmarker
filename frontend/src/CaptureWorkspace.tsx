@@ -312,6 +312,7 @@ async function textRequest(plainText: string, tags: string[]): Promise<CaptureTe
 function linkRequest(url: string, tags: string[]): CaptureLinkRequest {
   return {
     url,
+    title: null,
     tags,
     client_capture_id: randomId(),
   };

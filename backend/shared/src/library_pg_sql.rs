@@ -120,6 +120,15 @@ pub(super) const INSERT_CAPTURE_URL: &str = "
     ON CONFLICT (user_id, canonical_url)
     WHERE canonical_url IS NOT NULL
     DO NOTHING";
+pub(super) const INSERT_CAPTURE_TITLE: &str = "
+    INSERT INTO metadata_snapshots (
+        item_id,
+        user_id,
+        title,
+        archive_status,
+        captured_at
+    )
+    VALUES ($1, $2, $3, 'pending', now())";
 pub(super) const INSERT_TEXT_CAPTURE: &str = "
     INSERT INTO item_texts (
         item_id,

@@ -139,6 +139,10 @@ async function apiError(response: Response) {
   return new ApiClientError(
     response.status,
     payload.code ?? "api_error",
-    payload.message ?? response.statusText
+    apiErrorMessage(response, payload)
   );
+}
+
+function apiErrorMessage(response: Response, payload: ApiErrorPayload) {
+  return payload.message?.trim() || response.statusText.trim() || `HTTP ${response.status}`;
 }

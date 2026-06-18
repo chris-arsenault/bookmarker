@@ -8,17 +8,19 @@ import type { LibraryItemDetail } from "./types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe("ItemDetail deletion", () => {
+describe("ItemDetail delete confirmation", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("confirms_and_deletes_the_selected_item", async () => {
+  it("confirms_and_deletes_the_selected_item_without_a_browser_popup", async () => {
     const deletedItems: string[] = [];
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
-    const confirm = vi.fn(() => true);
+    const confirm = vi.fn(() => {
+      throw new Error("window.confirm should not be used");
+    });
     Object.defineProperty(window, "confirm", {
       configurable: true,
       value: confirm,
@@ -29,6 +31,7 @@ describe("ItemDetail deletion", () => {
         <ItemDetail
           availableTags={[]}
           detail={itemDetail}
+          onClose={() => undefined}
           onCopyLink={() => undefined}
           onDeleteItem={async (itemId) => {
             deletedItems.push(itemId);
@@ -44,8 +47,87 @@ describe("ItemDetail deletion", () => {
       await Promise.resolve();
     });
 
-    expect(confirm).toHaveBeenCalledWith("Delete this item?");
+    expect(confirm).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Delete this item?");
+    expect(deletedItems).toEqual([]);
+
+    await act(async () => {
+      clickButton(container, "Delete permanently");
+      await Promise.resolve();
+    });
+
     expect(deletedItems).toEqual(["item-1"]);
+    root.unmount();
+    container.remove();
+  });
+});
+
+describe("ItemDetail delete cancellation", () => {
+  it("cancels_the_custom_delete_confirmation", async () => {
+    const deletedItems: string[] = [];
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <ItemDetail
+          availableTags={[]}
+          detail={itemDetail}
+          onClose={() => undefined}
+          onCopyLink={() => undefined}
+          onDeleteItem={async (itemId) => {
+            deletedItems.push(itemId);
+          }}
+          onOpenSource={() => undefined}
+          onUpdateItem={async () => itemDetail}
+        />
+      );
+    });
+
+    await act(async () => {
+      clickButton(container, "Delete item");
+    });
+    await act(async () => {
+      clickButton(container, "Cancel");
+    });
+
+    expect(container.textContent).not.toContain("Delete this item?");
+    expect(deletedItems).toEqual([]);
+    root.unmount();
+    container.remove();
+  });
+});
+
+describe("ItemDetail text snippets", () => {
+  it("renders_saved_text_as_the_primary_content_area", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <ItemDetail
+          availableTags={[]}
+          detail={longSnippetDetail}
+          onClose={() => undefined}
+          onCopyLink={() => undefined}
+          onOpenSource={() => undefined}
+          onUpdateItem={async () => longSnippetDetail}
+        />
+      );
+    });
+
+    expect(container.querySelector("#detail-title")?.textContent).toBe("Saved text");
+    expect(container.querySelector(".thumbnail")).toBeNull();
+    expect(container.querySelector(".status-badge")).toBeNull();
+    expect(container.querySelector(".snippet-body-primary")?.textContent).toContain(
+      "first copied line"
+    );
+    expect(container.querySelector(".markdown-snippet strong")?.textContent).toBe(
+      "first copied line"
+    );
+    expect(container.querySelector('textarea[name="notes"]')?.getAttribute("rows")).toBe("2");
     root.unmount();
     container.remove();
   });
@@ -77,6 +159,27 @@ const itemDetail: LibraryItemDetail = {
     created_at: "2026-06-15T00:00:00Z",
   },
   notes: "",
+};
+
+const longSnippetDetail: LibraryItemDetail = {
+  ...itemDetail,
+  summary: {
+    ...itemDetail.summary,
+    text: {
+      plain_text: [
+        "**first copied line**",
+        "- second copied line with enough text to wrap inside the detail modal",
+        "- third copied line",
+      ].join("\n"),
+      preview: "first copied line",
+      content_hash: "hash-long",
+      html: null,
+      source_app: "Terminal",
+      source_device: null,
+      capture_method: "desktop_clipboard",
+    },
+  },
+  notes: "small note",
 };
 
 function clickButton(container: HTMLElement, label: string) {

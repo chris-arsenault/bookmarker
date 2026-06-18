@@ -14,7 +14,7 @@ use crate::library_pg_capture_helpers::{
 use crate::url_normalization::{normalize_url_with_resolver, NormalizedUrl};
 
 use super::UPSERT_TAG;
-use super::{canonical_conflict_without_row, database_error, PgLibraryService};
+use super::{canonical_conflict_without_row, database_error, PgLibraryService, UrlCaptureRows};
 use super::{GET_ITEM_BY_TEXT_HASH, INSERT_CAPTURE_ITEM, INSERT_ITEM_TAG, INSERT_TEXT_CAPTURE};
 
 pub(super) async fn capture_url(
@@ -51,6 +51,7 @@ pub(super) async fn capture_url(
             original_url,
             normalized_url,
             client_capture_id,
+            title: clean_optional(request.title),
             tags: request.tags,
         },
     )
@@ -62,6 +63,7 @@ struct UrlCaptureInsert {
     original_url: String,
     normalized_url: NormalizedUrl,
     client_capture_id: Option<String>,
+    title: Option<String>,
     tags: Vec<String>,
 }
 
@@ -72,13 +74,14 @@ async fn insert_url_capture(
 ) -> AppResult<CaptureItemOutcome> {
     let tags = validate_tags(&input.tags)?;
     let item_id = service
-        .insert_capture(
-            input.user_id,
-            &input.original_url,
-            &input.normalized_url,
-            input.client_capture_id.as_deref(),
-            &tags,
-        )
+        .insert_capture(UrlCaptureRows {
+            user_id: input.user_id,
+            original_url: &input.original_url,
+            normalized_url: &input.normalized_url,
+            client_capture_id: input.client_capture_id.as_deref(),
+            title: input.title.as_deref(),
+            tags: &tags,
+        })
         .await?;
     let Some(item_id) = item_id else {
         let item = service

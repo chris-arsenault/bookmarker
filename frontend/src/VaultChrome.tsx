@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { config } from "./config";
 import type { LibraryFilters } from "./libraryFilters";
 
@@ -30,11 +30,13 @@ export function VaultRail({
   filters,
   itemCount,
   tagCount,
+  children,
   onFiltersChange,
 }: {
   filters: LibraryFilters;
   itemCount: number;
   tagCount: number;
+  children?: ReactNode;
   onFiltersChange: (filters: LibraryFilters) => void;
 }) {
   return (
@@ -59,6 +61,7 @@ export function VaultRail({
           />
         ))}
       </nav>
+      {children ? <div className="rail-capture">{children}</div> : null}
       <div className="rail-foot">
         <div className="rail-stat">
           <strong>{itemCount}</strong>

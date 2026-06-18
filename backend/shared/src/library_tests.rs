@@ -190,6 +190,7 @@ async fn in_memory_capture_accepts_url_without_tags() {
             &user(),
             CaptureItemRequest {
                 url: "https://example.com/watch?utm_source=share".to_string(),
+                title: None,
                 tags: Vec::new(),
                 client_capture_id: None,
             },
@@ -217,6 +218,26 @@ async fn in_memory_capture_accepts_url_without_tags() {
     );
     assert_eq!(outcome.item.summary.archive_status, ArchiveStatus::Pending);
     assert_eq!(outcome.item.summary.tags, Vec::new());
+}
+
+#[tokio::test]
+async fn in_memory_capture_accepts_optional_link_title() {
+    let service = InMemoryLibraryService::new();
+
+    let outcome = service
+        .capture_item(
+            &user(),
+            CaptureItemRequest {
+                url: "https://example.com/watch".to_string(),
+                title: Some(" Shared title ".to_string()),
+                tags: Vec::new(),
+                client_capture_id: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.item.summary.title.as_deref(), Some("Shared title"));
 }
 
 #[tokio::test]
@@ -261,6 +282,7 @@ async fn in_memory_capture_applies_only_explicit_tags() {
             &user(),
             CaptureItemRequest {
                 url: "https://example.com/watch".to_string(),
+                title: None,
                 tags: vec![" Learning ".to_string(), "learning".to_string()],
                 client_capture_id: None,
             },
@@ -282,6 +304,7 @@ async fn in_memory_capture_reuses_client_capture_id() {
     let service = InMemoryLibraryService::new();
     let request = CaptureItemRequest {
         url: "https://example.com/watch".to_string(),
+        title: None,
         tags: Vec::new(),
         client_capture_id: Some("share-attempt-1".to_string()),
     };
@@ -314,6 +337,7 @@ async fn in_memory_capture_deduplicates_by_normalized_url() {
             &user(),
             CaptureItemRequest {
                 url: "https://youtu.be/video-id?utm_source=share&t=42".to_string(),
+                title: None,
                 tags: vec!["Learning".to_string()],
                 client_capture_id: Some("share-attempt-normalized-1".to_string()),
             },
@@ -325,6 +349,7 @@ async fn in_memory_capture_deduplicates_by_normalized_url() {
             &user(),
             CaptureItemRequest {
                 url: "https://www.youtube.com/watch?v=video-id&t=42&utm_campaign=again".to_string(),
+                title: None,
                 tags: vec!["Later".to_string()],
                 client_capture_id: Some("share-attempt-normalized-2".to_string()),
             },

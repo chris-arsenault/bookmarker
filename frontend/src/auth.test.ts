@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { createAuthClient, createDesktopCognitoStorage, type AuthAdapter } from "./auth";
+import { createAuthClient, type AuthAdapter } from "./auth";
+import {
+  cognitoSessionFromStoredAuthSession,
+  createAuthSessionStore,
+  type StoredAuthSession,
+} from "./authSessionStore";
 import type { DesktopBridge } from "./desktopBridge";
 
-describe("auth client", () => {
+describe("auth client session flow", () => {
   it("auth_client_reports_signed_out_without_session", async () => {
     const adapter: AuthAdapter = {
       getSession: async () => null,
@@ -44,6 +49,24 @@ describe("auth client", () => {
     });
   });
 
+  it("auth_client_keeps_the_mfa_session_available_before_storage_round_trip", async () => {
+    const auth = createAuthClient({
+      adapter: fakeAdapter({
+        getSession: async () => null,
+        signIn: async () => ({ status: "mfa-required", username: "chris" }),
+        confirmMfa: async () => ({ status: "signed-in", session: fakeSession }),
+      }),
+    });
+
+    await auth.signIn("chris", "password");
+    await auth.confirmMfa("123456");
+
+    await expect(auth.getAccessToken()).resolves.toBe("access-token");
+    expect(auth.getState()).toMatchObject({ status: "signed-in" });
+  });
+});
+
+describe("auth client mfa setup flow", () => {
   it("auth_client_exposes_software_token_setup_challenge", async () => {
     const auth = createAuthClient({
       adapter: fakeAdapter({
@@ -68,16 +91,28 @@ describe("auth client", () => {
     await auth.verifyMfaSetup("123456");
     expect(auth.getState()).toMatchObject({ status: "signed-in" });
   });
+});
 
-  it("desktop_cognito_storage_uses_the_electron_credential_bridge", () => {
+describe("auth session store", () => {
+  it("auth_session_store_persists_the_app_owned_token_bundle_through_the_desktop_bridge", () => {
     const values = new Map<string, string>();
-    const storage = createDesktopCognitoStorage(fakeDesktopBridge(values));
+    const store = createAuthSessionStore(fakeDesktopBridge(values));
+    const session = storedSession();
 
-    storage?.setItem("token", "saved-token");
+    store.save(session);
 
-    expect(storage?.getItem("token")).toBe("saved-token");
-    storage?.removeItem("token");
-    expect(storage?.getItem("token")).toBeNull();
+    expect(store.load()).toEqual(session);
+    store.clear();
+    expect(store.load()).toBeNull();
+  });
+
+  it("auth_session_store_rebuilds_cognito_sessions_from_persisted_tokens", () => {
+    const stored = storedSession();
+    const session = cognitoSessionFromStoredAuthSession(stored);
+
+    expect(session.isValid()).toBe(true);
+    expect(session.getAccessToken().getJwtToken()).toBe(stored.accessToken);
+    expect(session.getRefreshToken().getToken()).toBe(stored.refreshToken);
   });
 });
 
@@ -112,11 +147,43 @@ const fakeSession = {
   isValid: () => true,
 };
 
+function storedSession(): StoredAuthSession {
+  const now = Math.floor(Date.now() / 1000);
+  return {
+    username: "chris",
+    idToken: jwt({
+      sub: "sub",
+      email: "chris@example.test",
+      "cognito:username": "chris",
+      exp: now + 3600,
+      iat: now - 60,
+    }),
+    accessToken: jwt({
+      sub: "sub",
+      scope: "openid",
+      exp: now + 3600,
+      iat: now - 60,
+    }),
+    refreshToken: "refresh-token",
+  };
+}
+
+function jwt(payload: Record<string, unknown>) {
+  return [base64Url({ alg: "none", typ: "JWT" }), base64Url(payload), "signature"].join(".");
+}
+
+function base64Url(value: Record<string, unknown>) {
+  const encoded = btoa(JSON.stringify(value)).replaceAll("+", "-").replaceAll("/", "_");
+  const paddingIndex = encoded.indexOf("=");
+  return paddingIndex === -1 ? encoded : encoded.slice(0, paddingIndex);
+}
+
 function fakeDesktopBridge(values: Map<string, string>): DesktopBridge {
   return {
     readClipboardText: async () => "",
     writeClipboardText: async () => undefined,
     platform: async () => "test",
+    credentialPath: async () => "/home/test/.config/Bookmarker/cognito-session.json",
     credentialGet: (key) => values.get(key) ?? null,
     credentialSet: (key, value) => {
       values.set(key, value);

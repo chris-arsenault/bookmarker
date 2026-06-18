@@ -10,9 +10,12 @@ object ShareIntentParser {
             return null
         }
         val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty().trim()
-        val url = urlPattern.find(text)?.value?.trimEnd('.', ',', ')')
-        if (url != null) {
-            return SharedCapture.Url(url)
+        val urlMatch = urlPattern.find(text)
+        if (urlMatch != null) {
+            return SharedCapture.Url(
+                url = cleanUrl(urlMatch.value),
+                title = sharedTitle(intent, text, urlMatch),
+            )
         }
         return text.takeIf { it.isNotBlank() }?.let(SharedCapture::Text)
     }
@@ -20,13 +23,34 @@ object ShareIntentParser {
     fun parseUrl(intent: Intent): String? {
         return (parse(intent) as? SharedCapture.Url)?.url
     }
+
+    private fun sharedTitle(intent: Intent, text: String, urlMatch: MatchResult): String? {
+        val candidates = listOf(
+            intent.getStringExtra(Intent.EXTRA_TITLE),
+            intent.getStringExtra(Intent.EXTRA_SUBJECT),
+            text.removeRange(urlMatch.range),
+        )
+        return candidates.firstNotNullOfOrNull(::cleanTitle)
+    }
+
+    private fun cleanUrl(value: String): String =
+        value.trim().trimEnd('.', ',', ')')
+
+    private fun cleanTitle(value: String?): String? {
+        val trimmed = value
+            ?.trim()
+            ?.trim('-', ':', '|', '(', ')', '[', ']', '.', ',')
+            ?.trim()
+            .orEmpty()
+        return trimmed.takeIf { it.isNotBlank() && urlPattern.find(it) == null }
+    }
 }
 
 sealed class SharedCapture {
     abstract val preview: String
 
-    data class Url(val url: String) : SharedCapture() {
-        override val preview = url
+    data class Url(val url: String, val title: String?) : SharedCapture() {
+        override val preview = listOfNotNull(title, url).joinToString("\n")
     }
 
     data class Text(val plainText: String) : SharedCapture() {

@@ -8,6 +8,8 @@ import type {
   WatchStatus,
 } from "./types";
 
+type OrganizerDensity = "default" | "compact";
+
 const watchOptions: { label: string; value: WatchStatus }[] = [
   { label: "Unwatched", value: "unwatched" },
   { label: "Watched", value: "watched" },
@@ -21,10 +23,12 @@ const inboxOptions: { label: string; value: InboxStatus }[] = [
 export function ItemOrganizer({
   detail,
   availableTags,
+  density,
   onUpdateItem,
 }: {
   detail: LibraryItemDetail;
   availableTags: TagCorpusEntry[];
+  density: OrganizerDensity;
   onUpdateItem: (itemId: string, request: UpdateItemRequest) => Promise<LibraryItemDetail>;
 }) {
   const [saving, setSaving] = useState(false);
@@ -42,11 +46,19 @@ export function ItemOrganizer({
     }
   };
   return (
-    <form className="item-organizer" onSubmit={submit}>
+    <form
+      className={density === "compact" ? "item-organizer compact" : "item-organizer"}
+      onSubmit={submit}
+    >
       <h3>Edit item</h3>
       <label className="organizer-field">
         Notes
-        <textarea defaultValue={detail.notes} disabled={saving} name="notes" rows={4} />
+        <textarea
+          defaultValue={detail.notes}
+          disabled={saving}
+          name="notes"
+          rows={density === "compact" ? 2 : 4}
+        />
       </label>
       <TagEditor
         availableTags={availableTags}

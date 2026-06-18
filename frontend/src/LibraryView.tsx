@@ -1,9 +1,10 @@
-import { CaptureWorkspace } from "./CaptureWorkspace";
+import { useState } from "react";
 import { FilterBar } from "./FilterBar";
 import { ItemDetail } from "./ItemDetail";
 import { LibraryFeed } from "./LibraryFeed";
 import { createLibraryViewModel, type LibraryState, type LibraryViewModel } from "./libraryState";
 import { platformOptions, tagOptions, type LibraryFilters } from "./libraryFilters";
+import { QuickTextCapture } from "./QuickTextCapture";
 import { TagManager } from "./TagManager";
 import { AppBar, VaultRail } from "./VaultChrome";
 import { config } from "./config";
@@ -62,14 +63,26 @@ function ReadyLibraryView({
   onRenameTag,
   onMergeTags,
 }: ReadyLibraryViewProps) {
+  const detailModal = useDetailModal(viewModel.selectedDetail, onSelectItem);
+  const changeFilters = (nextFilters: LibraryFilters) => {
+    detailModal.close();
+    onFiltersChange(nextFilters);
+  };
+
   return (
     <div className="vault">
       <VaultRail
         filters={filters}
         itemCount={viewModel.items.length}
-        onFiltersChange={onFiltersChange}
+        onFiltersChange={changeFilters}
         tagCount={viewModel.tags.length}
-      />
+      >
+        <RailCapture
+          tags={viewModel.tags}
+          onCreateLink={onCreateLink}
+          onCreateText={onCreateText}
+        />
+      </VaultRail>
       <main className="workspace">
         <AppBar
           activeFilters={activeFilterCount(filters)}
@@ -78,40 +91,27 @@ function ReadyLibraryView({
         />
         <div className="workspace-body">
           <div className="primary-column">
-            {onCreateText && onCreateLink ? (
-              <CaptureWorkspace
-                onCreateLink={onCreateLink}
-                onCreateText={onCreateText}
-                tags={viewModel.tags}
-              />
-            ) : null}
-            <FilterBar
+            <SearchHeader
+              activeFilters={activeFilterCount(filters)}
               filters={filters}
+              onFiltersChange={changeFilters}
+              onMergeTags={onMergeTags}
+              onRenameTag={onRenameTag}
               platforms={platformOptions(viewModel.items)}
               tags={tagOptions(viewModel.tags)}
-              onFiltersChange={onFiltersChange}
+              tagCorpus={viewModel.tags}
             />
-            <div className="feed-scroll">
-              <LibraryFeed
-                items={viewModel.items}
-                selectedItemId={viewModel.selectedItem?.id ?? null}
-                thumbnailUrls={thumbnailUrls}
-                onCopyItem={onCopyLink}
-                onSelectItem={onSelectItem}
-              />
-              <details className="corpus">
-                <summary>Tag corpus</summary>
-                <TagManager
-                  tags={viewModel.tags}
-                  onMergeTags={onMergeTags}
-                  onRenameTag={onRenameTag}
-                />
-              </details>
-            </div>
+            <FeedPanel
+              thumbnailUrls={thumbnailUrls}
+              viewModel={viewModel}
+              onCopyLink={onCopyLink}
+              onSelectItem={detailModal.open}
+            />
           </div>
           <ItemDetail
             availableTags={viewModel.tags}
-            detail={viewModel.selectedDetail}
+            detail={detailModal.detail}
+            onClose={detailModal.close}
             onCopyLink={onCopyLink}
             onDeleteItem={onDeleteItem}
             onOpenSource={onOpenSource}
@@ -120,6 +120,99 @@ function ReadyLibraryView({
         </div>
       </main>
     </div>
+  );
+}
+
+function RailCapture({
+  tags,
+  onCreateText,
+  onCreateLink,
+}: {
+  tags: TagCorpusEntry[];
+  onCreateText: ReadyLibraryViewProps["onCreateText"];
+  onCreateLink: ReadyLibraryViewProps["onCreateLink"];
+}) {
+  if (!onCreateText || !onCreateLink) {
+    return null;
+  }
+  return <QuickTextCapture tags={tags} onCreateLink={onCreateLink} onCreateText={onCreateText} />;
+}
+
+function FeedPanel({
+  viewModel,
+  thumbnailUrls,
+  onCopyLink,
+  onSelectItem,
+}: {
+  viewModel: LibraryViewModel;
+  thumbnailUrls: Record<string, string>;
+  onCopyLink: (item: LibraryItemSummary) => void;
+  onSelectItem: (itemId: string) => void;
+}) {
+  return (
+    <div className="feed-scroll">
+      <LibraryFeed
+        items={viewModel.items}
+        selectedItemId={viewModel.selectedItem?.id ?? null}
+        thumbnailUrls={thumbnailUrls}
+        onCopyItem={onCopyLink}
+        onSelectItem={onSelectItem}
+      />
+    </div>
+  );
+}
+
+function useDetailModal(
+  selectedDetail: LibraryItemDetail | null,
+  onSelectItem: (itemId: string) => void
+) {
+  const [modalItemId, setModalItemId] = useState<string | null>(null);
+  return {
+    detail: selectedDetail?.summary.id === modalItemId ? selectedDetail : null,
+    open: (itemId: string) => {
+      setModalItemId(itemId);
+      onSelectItem(itemId);
+    },
+    close: () => setModalItemId(null),
+  };
+}
+
+function SearchHeader({
+  filters,
+  platforms,
+  tags,
+  tagCorpus,
+  activeFilters,
+  onFiltersChange,
+  onRenameTag,
+  onMergeTags,
+}: {
+  filters: LibraryFilters;
+  platforms: ReturnType<typeof platformOptions>;
+  tags: ReturnType<typeof tagOptions>;
+  tagCorpus: TagCorpusEntry[];
+  activeFilters: number;
+  onFiltersChange: (filters: LibraryFilters) => void;
+  onRenameTag: (tagId: string, request: RenameTagRequest) => Promise<TagCorpusEntry[]>;
+  onMergeTags: (sourceTagId: string, request: MergeTagsRequest) => Promise<TagCorpusEntry[]>;
+}) {
+  return (
+    <details className="search-drawer">
+      <summary>
+        <span>Search and filters</span>
+        <small>{activeFilters} active</small>
+      </summary>
+      <FilterBar
+        filters={filters}
+        platforms={platforms}
+        tags={tags}
+        onFiltersChange={onFiltersChange}
+      />
+      <details className="corpus">
+        <summary>Tag corpus</summary>
+        <TagManager tags={tagCorpus} onMergeTags={onMergeTags} onRenameTag={onRenameTag} />
+      </details>
+    </details>
   );
 }
 

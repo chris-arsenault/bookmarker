@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ApiClient } from "./api";
 import { createAuthClient, type AuthState } from "./auth";
 import { desktopBridge } from "./desktopBridge";
-import { formatDate } from "./LibraryFeed";
+import { formatDate } from "./dateDisplay";
 import { itemCopyValue, itemFeedMeta, itemTitle } from "./itemDisplay";
 import type { LibraryItemSummary } from "./types";
 

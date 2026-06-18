@@ -97,6 +97,7 @@ class ShareActivity : Activity() {
             is SharedCapture.Url -> apiClient.capture(
                 CaptureAttempt(
                     url = capture.url,
+                    title = capture.title,
                     tags = tags,
                     clientCaptureId = clientCaptureId,
                 ),

@@ -3,6 +3,17 @@ export type WatchStatus = "unwatched" | "watched";
 export type InboxStatus = "unsorted" | "organized";
 export type ItemKind = "url" | "text_snippet";
 
+export type ApiDateTime =
+  | string
+  | number
+  | number[]
+  | Partial<
+      Record<
+        "seconds" | "secs" | "unix_timestamp" | "unixTimestamp" | "nanos" | "nanoseconds",
+        number
+      >
+    >;
+
 export type ItemTag = {
   id: string;
   display_name: string;
@@ -30,7 +41,7 @@ export type LibraryItemSummary = {
   watch_status: WatchStatus;
   inbox_status: InboxStatus;
   tags: ItemTag[];
-  created_at: string;
+  created_at: ApiDateTime;
 };
 
 export type ItemUrlSummary = {
@@ -89,6 +100,7 @@ export type CaptureTextRequest = {
 
 export type CaptureLinkRequest = {
   url: string;
+  title: string | null;
   tags: string[];
   client_capture_id: string | null;
 };

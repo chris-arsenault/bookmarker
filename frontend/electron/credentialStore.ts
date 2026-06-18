@@ -8,6 +8,7 @@ const encryptedPrefix = "safe:v1:";
 const plainPrefix = "plain:v1:";
 
 export type DesktopCredentialStore = {
+  path: string;
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;
   removeItem: (key: string) => void;
@@ -16,12 +17,30 @@ export type DesktopCredentialStore = {
 
 export function createDesktopCredentialStore(): DesktopCredentialStore {
   const storePath = path.join(app.getPath("userData"), "cognito-session.json");
+  const legacyStorePaths = legacyCredentialStorePaths(storePath);
   return {
-    getItem: (key) => decodeValue(readStore(storePath)[key]),
+    path: storePath,
+    getItem: (key) => readDecodedValue(storePath, legacyStorePaths, key),
     setItem: (key, value) => writeStoreValue(storePath, key, value),
     removeItem: (key) => removeStoreValue(storePath, key),
     clear: () => clearStore(storePath),
   };
+}
+
+function readDecodedValue(storePath: string, legacyStorePaths: string[], key: string) {
+  for (const candidatePath of [storePath, ...legacyStorePaths]) {
+    const value = decodeValue(readStore(candidatePath)[key]);
+    if (value !== null) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function legacyCredentialStorePaths(storePath: string) {
+  return ["bookmarker-desktop", "bookmarker-frontend"]
+    .map((name) => path.join(app.getPath("appData"), name, "cognito-session.json"))
+    .filter((legacyPath) => legacyPath !== storePath);
 }
 
 function writeStoreValue(storePath: string, key: string, value: string) {
@@ -69,13 +88,17 @@ function decodeValue(value: string | undefined) {
   if (!value) {
     return null;
   }
-  if (value.startsWith(encryptedPrefix)) {
-    return safeStorage.decryptString(Buffer.from(value.slice(encryptedPrefix.length), "base64"));
+  try {
+    if (value.startsWith(encryptedPrefix)) {
+      return safeStorage.decryptString(Buffer.from(value.slice(encryptedPrefix.length), "base64"));
+    }
+    if (value.startsWith(plainPrefix)) {
+      return value.slice(plainPrefix.length);
+    }
+    return value;
+  } catch {
+    return null;
   }
-  if (value.startsWith(plainPrefix)) {
-    return value.slice(plainPrefix.length);
-  }
-  return value;
 }
 
 function isStoredCredentials(value: unknown): value is StoredCredentials {

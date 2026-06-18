@@ -105,6 +105,7 @@ describe("CaptureWorkspace link capture", () => {
     expect(linkRequests).toEqual([
       expect.objectContaining({
         url: "https://example.com/watch",
+        title: null,
         tags: ["Research"],
       }),
     ]);

@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("bookmarkerDesktop", {
   readClipboardText: () => ipcRenderer.invoke("desktop:read-clipboard-text"),
   writeClipboardText: (value: string) => ipcRenderer.invoke("desktop:write-clipboard-text", value),
   platform: () => ipcRenderer.invoke("desktop:platform"),
+  credentialPath: () => ipcRenderer.invoke("desktop:credential-path"),
   credentialGet: (key: string) => ipcRenderer.sendSync("desktop:credential-get", key),
   credentialSet: (key: string, value: string) =>
     ipcRenderer.sendSync("desktop:credential-set", key, value),

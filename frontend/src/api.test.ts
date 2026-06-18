@@ -128,6 +128,7 @@ describe("ApiClient item capture", () => {
 
     await client.captureLink({
       url: "https://example.com/watch",
+      title: "Manual link title",
       tags: ["Research"],
       client_capture_id: "manual-link-1",
     });
@@ -140,6 +141,7 @@ describe("ApiClient item capture", () => {
     ]);
     expect(JSON.parse(calls[0].body ?? "{}")).toEqual({
       url: "https://example.com/watch",
+      title: "Manual link title",
       tags: ["Research"],
       client_capture_id: "manual-link-1",
     });
@@ -169,6 +171,18 @@ describe("ApiClient auth", () => {
       "Bearer expired-token",
       "Bearer fresh-token",
     ]);
+  });
+});
+
+describe("ApiClient errors", () => {
+  it("api_client_uses_a_non_empty_message_for_empty_error_payloads", async () => {
+    const client = new ApiClient({
+      baseUrl: "https://api.example.test",
+      getAccessToken: async () => "access-token",
+      fetchImpl: async () => jsonResponse({ message: "" }, 500),
+    });
+
+    await expect(client.listTags()).rejects.toThrow("HTTP 500");
   });
 });
 

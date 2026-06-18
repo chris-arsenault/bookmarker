@@ -60,7 +60,7 @@ async fn capture_route_accepts_url_without_tags_and_lists_item() {
         "/items",
         Some(&auth),
         Body::from(
-            r#"{"url":"https://example.com/watch?utm_source=share","client_capture_id":"capture-1"}"#,
+            r#"{"url":"https://example.com/watch?utm_source=share","title":"Shared title","client_capture_id":"capture-1"}"#,
         ),
     )
     .await;
@@ -79,6 +79,7 @@ async fn capture_route_accepts_url_without_tags_and_lists_item() {
         payload["item"]["summary"]["url"]["copy_url"],
         "https://example.com/watch"
     );
+    assert_eq!(payload["item"]["summary"]["title"], "Shared title");
 
     let response = request(
         test_app(library),
@@ -97,6 +98,7 @@ async fn capture_route_accepts_url_without_tags_and_lists_item() {
         "https://example.com/watch?utm_source=share"
     );
     assert_eq!(payload[0]["url"]["copy_url"], "https://example.com/watch");
+    assert_eq!(payload[0]["title"], "Shared title");
 }
 
 #[tokio::test]

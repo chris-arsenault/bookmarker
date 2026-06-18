@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::auth::UserContext;
 use crate::db::DbPool;
-use crate::domain::{ArchiveStatus, InboxStatus, ItemKind, TagName, WatchStatus};
+use crate::domain::{ArchiveStatus, InboxStatus, WatchStatus};
 use crate::error::{AppError, AppResult};
 use crate::library::{
     CaptureItemOutcome, CaptureItemRequest, ItemTag, LibraryItemDetail, LibraryItemSummary,
@@ -13,10 +13,12 @@ use crate::library::{
     UpdateItemRequest,
 };
 use crate::library_pg_capture_helpers::validate_tags;
-use crate::url_normalization::{HttpShortUrlResolver, NormalizedUrl, ShortUrlResolver};
+use crate::url_normalization::{HttpShortUrlResolver, ShortUrlResolver};
 
 #[path = "library_pg_capture.rs"]
 mod library_pg_capture;
+#[path = "library_pg_capture_insert.rs"]
+mod library_pg_capture_insert;
 #[path = "library_pg_delete.rs"]
 mod library_pg_delete;
 #[path = "library_pg_filters.rs"]
@@ -28,6 +30,7 @@ mod library_pg_sql;
 #[path = "library_pg_tag_ops.rs"]
 mod library_pg_tag_ops;
 
+use library_pg_capture_insert::UrlCaptureRows;
 use library_pg_filters::PgListFilters;
 use library_pg_rows::{ItemRow, ItemTagRow, TagCorpusRow};
 use library_pg_sql::*;
@@ -294,53 +297,8 @@ impl PgLibraryService {
         }
     }
 
-    async fn insert_capture(
-        &self,
-        user_id: Uuid,
-        original_url: &str,
-        normalized_url: &NormalizedUrl,
-        client_capture_id: Option<&str>,
-        tags: &[TagName],
-    ) -> AppResult<Option<Uuid>> {
-        let mut transaction = self.db.begin().await.map_err(database_error)?;
-        let item_id = sqlx::query_scalar(INSERT_CAPTURE_ITEM)
-            .bind(user_id)
-            .bind(client_capture_id)
-            .bind(ItemKind::Url.as_str())
-            .fetch_one(&mut *transaction)
-            .await
-            .map_err(database_error)?;
-        let insert_url = sqlx::query(INSERT_CAPTURE_URL)
-            .bind(item_id)
-            .bind(user_id)
-            .bind(original_url)
-            .bind(normalized_url.canonical_url.as_deref())
-            .bind(normalized_url.normalization_status.as_str())
-            .bind(normalized_url.normalization_error.as_deref())
-            .execute(&mut *transaction)
-            .await
-            .map_err(database_error)?;
-        if insert_url.rows_affected() == 0 {
-            transaction.rollback().await.map_err(database_error)?;
-            return Ok(None);
-        }
-        for tag in tags {
-            let tag_id: Uuid = sqlx::query_scalar(UPSERT_TAG)
-                .bind(user_id)
-                .bind(tag.display_name())
-                .fetch_one(&mut *transaction)
-                .await
-                .map_err(database_error)?;
-            sqlx::query(INSERT_ITEM_TAG)
-                .bind(item_id)
-                .bind(tag_id)
-                .bind(user_id)
-                .execute(&mut *transaction)
-                .await
-                .map_err(database_error)?;
-        }
-        transaction.commit().await.map_err(database_error)?;
-        Ok(Some(item_id))
+    async fn insert_capture(&self, input: UrlCaptureRows<'_>) -> AppResult<Option<Uuid>> {
+        library_pg_capture_insert::insert_capture(&self.db, input).await
     }
 }
 

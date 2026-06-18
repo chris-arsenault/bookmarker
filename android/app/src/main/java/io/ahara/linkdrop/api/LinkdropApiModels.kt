@@ -6,12 +6,14 @@ import java.util.UUID
 
 data class CaptureAttempt(
     val url: String,
+    val title: String? = null,
     val tags: List<String> = emptyList(),
     val clientCaptureId: String = UUID.randomUUID().toString(),
 ) {
     fun toJson(): String =
         JSONObject()
             .put("url", url)
+            .put("title", title ?: JSONObject.NULL)
             .put("tags", JSONArray(tags))
             .put("client_capture_id", clientCaptureId)
             .toString()
