@@ -3,6 +3,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TF_DIR="${ROOT_DIR}/infrastructure/terraform"
+PLATFORM_BIN="${ROOT_DIR}/../ahara/bin"
+
+if [ -d "${PLATFORM_BIN}" ]; then
+  PATH="${PLATFORM_BIN}:${PATH}"
+fi
 
 STATE_BUCKET="${STATE_BUCKET:-tfstate-559098897826}"
 STATE_REGION="${STATE_REGION:-us-east-1}"
