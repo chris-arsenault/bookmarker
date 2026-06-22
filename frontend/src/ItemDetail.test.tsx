@@ -8,11 +8,11 @@ import type { LibraryItemDetail } from "./types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe("ItemDetail delete confirmation", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
+describe("ItemDetail delete confirmation", () => {
   it("confirms_and_deletes_the_selected_item_without_a_browser_popup", async () => {
     const deletedItems: string[] = [];
     const container = document.createElement("div");
@@ -57,6 +57,65 @@ describe("ItemDetail delete confirmation", () => {
     });
 
     expect(deletedItems).toEqual(["item-1"]);
+    root.unmount();
+    container.remove();
+  });
+});
+
+describe("ItemDetail link deletion state", () => {
+  it("does_not_carry_a_stuck_deleting_state_between_link_items", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    let releaseDelete: (() => void) | null = null;
+    const onDeleteItem = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseDelete = resolve;
+        })
+    );
+
+    await act(async () => {
+      root.render(
+        <ItemDetail
+          availableTags={[]}
+          detail={linkDetail("link-1")}
+          onClose={() => undefined}
+          onCopyLink={() => undefined}
+          onDeleteItem={onDeleteItem}
+          onOpenSource={() => undefined}
+          onUpdateItem={async () => linkDetail("link-1")}
+        />
+      );
+    });
+    await act(async () => {
+      clickButton(container, "Delete item");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      clickButton(container, "Delete permanently");
+      await Promise.resolve();
+    });
+
+    expect(findButton(container, "Deleting")?.disabled).toBe(true);
+
+    await act(async () => {
+      root.render(
+        <ItemDetail
+          availableTags={[]}
+          detail={linkDetail("link-2")}
+          onClose={() => undefined}
+          onCopyLink={() => undefined}
+          onDeleteItem={onDeleteItem}
+          onOpenSource={() => undefined}
+          onUpdateItem={async () => linkDetail("link-2")}
+        />
+      );
+    });
+
+    const deleteButton = findButton(container, "Delete item");
+    expect(deleteButton?.disabled).toBe(false);
+    releaseDelete?.();
     root.unmount();
     container.remove();
   });
@@ -182,9 +241,32 @@ const longSnippetDetail: LibraryItemDetail = {
   notes: "small note",
 };
 
+function linkDetail(id: string): LibraryItemDetail {
+  return {
+    ...itemDetail,
+    summary: {
+      ...itemDetail.summary,
+      id,
+      item_kind: "url",
+      url: {
+        original_url: `https://example.com/${id}`,
+        canonical_url: null,
+        copy_url: `https://example.com/${id}`,
+      },
+      text: null,
+      title: "Saved link",
+      archive_status: "pending",
+    },
+  };
+}
+
 function clickButton(container: HTMLElement, label: string) {
+  findButton(container, label)?.click();
+}
+
+function findButton(container: HTMLElement, label: string) {
   const button = [...container.querySelectorAll("button")].find(
     (element) => element.textContent === label
   ) as HTMLButtonElement;
-  button.click();
+  return button;
 }

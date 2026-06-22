@@ -15,8 +15,8 @@ use crate::url_normalization::{
 use super::library_query::item_matches_query;
 use super::{
     CaptureItemOutcome, CaptureItemRequest, CaptureTextRequest, ItemTag, ItemUrlSummary,
-    LibraryItemDetail, LibraryItemSummary, LibraryService, ListItemsQuery, MergeTagsRequest,
-    RenameTagRequest, TagCorpusEntry, UpdateItemRequest,
+    LibraryItemDetail, LibraryItemSummary, LibraryService, LibraryUpdates, ListItemUpdatesQuery,
+    ListItemsQuery, MergeTagsRequest, RenameTagRequest, TagCorpusEntry, UpdateItemRequest,
 };
 
 pub struct InMemoryLibraryService {
@@ -34,6 +34,8 @@ type CaptureIdsByUser = HashMap<String, HashMap<String, Uuid>>;
 mod library_in_memory_delete;
 #[path = "library_in_memory_text.rs"]
 mod library_in_memory_text;
+#[path = "library_in_memory_update.rs"]
+mod library_in_memory_update;
 #[path = "library_in_memory_tag_ops.rs"]
 mod tag_ops;
 
@@ -153,6 +155,43 @@ impl LibraryService for InMemoryLibraryService {
             .collect())
     }
 
+    async fn list_item_updates(
+        &self,
+        user: &UserContext,
+        query: &ListItemUpdatesQuery,
+    ) -> AppResult<LibraryUpdates> {
+        let cursor = OffsetDateTime::now_utc();
+        let tags = self.list_tag_corpus(user).await?;
+        let Some(since) = query.since else {
+            return Ok(LibraryUpdates {
+                items: Vec::new(),
+                deleted_item_ids: Vec::new(),
+                tags,
+                cursor,
+            });
+        };
+        let items: Vec<LibraryItemSummary> = self
+            .items_by_user
+            .lock()
+            .unwrap()
+            .get(&user.sub)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|item| item.summary.created_at > since)
+            .filter(|item| item_matches_query(item, &query.filters))
+            .take(query.limit as usize)
+            .map(|item| item.summary)
+            .collect();
+        let cursor = library_in_memory_update::limited_cursor(cursor, query.limit, &items);
+        Ok(LibraryUpdates {
+            items,
+            deleted_item_ids: Vec::new(),
+            tags,
+            cursor,
+        })
+    }
+
     async fn get_item(&self, user: &UserContext, item_id: Uuid) -> AppResult<LibraryItemDetail> {
         self.find_item(user, item_id)
     }
@@ -173,30 +212,7 @@ impl LibraryService for InMemoryLibraryService {
         item_id: Uuid,
         request: UpdateItemRequest,
     ) -> AppResult<LibraryItemDetail> {
-        let mut items = self.items_by_user.lock().unwrap();
-        let user_items = items.get_mut(&user.sub).ok_or_else(|| not_found(item_id))?;
-        let item = user_items
-            .iter_mut()
-            .find(|item| item.summary.id == item_id)
-            .ok_or_else(|| not_found(item_id))?;
-        if let Some(watch_status) = request.watch_status {
-            item.summary.watch_status = watch_status;
-        }
-        if let Some(inbox_status) = request.inbox_status {
-            item.summary.inbox_status = inbox_status;
-        }
-        if let Some(notes) = request.notes {
-            item.notes = notes;
-        }
-        if let Some(tags) = request.tags {
-            item.summary.tags = tag_ops::replace_item_tags(
-                &self.tags_by_user,
-                &user.sub,
-                &item.summary.tags,
-                &tags,
-            )?;
-        }
-        Ok(item.clone())
+        library_in_memory_update::update_item(self, user, item_id, request)
     }
 
     async fn delete_item(&self, user: &UserContext, item_id: Uuid) -> AppResult<()> {

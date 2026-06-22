@@ -12,6 +12,8 @@ import type {
   CaptureLinkRequest,
   CaptureTextRequest,
   CaptureItemOutcome,
+  LibraryUpdates,
+  ListItemUpdatesRequest,
   ListItemsFilters,
   MergeTagsRequest,
   RenameTagRequest,
@@ -34,6 +36,10 @@ export class ApiClient {
 
   listItems(filters: ListItemsFilters = {}) {
     return this.request<LibraryItemSummary[]>(`/items${listItemsQuery(filters)}`);
+  }
+
+  listItemUpdates(request: ListItemUpdatesRequest = {}) {
+    return this.request<LibraryUpdates>(`/items/updates${listItemUpdatesQuery(request)}`);
   }
 
   captureText(request: CaptureTextRequest) {
@@ -109,6 +115,21 @@ export class ApiClient {
 
 function listItemsQuery(filters: ListItemsFilters) {
   const params = new URLSearchParams();
+  setListFilterParams(params, filters);
+  return queryString(params);
+}
+
+function listItemUpdatesQuery(request: ListItemUpdatesRequest) {
+  const params = new URLSearchParams();
+  setParam(params, "since", request.since);
+  if (request.limit !== undefined) {
+    params.set("limit", request.limit.toString());
+  }
+  setListFilterParams(params, request);
+  return queryString(params);
+}
+
+function setListFilterParams(params: URLSearchParams, filters: ListItemsFilters) {
   setParam(params, "platform", filters.platform);
   setParam(params, "tag", filters.tag);
   setParam(params, "created_from", filters.createdFrom);
@@ -117,7 +138,6 @@ function listItemsQuery(filters: ListItemsFilters) {
   setParam(params, "watch_status", filters.watchStatus);
   setParam(params, "inbox_status", filters.inboxStatus);
   setParam(params, "q", filters.q);
-  return queryString(params);
 }
 
 function setParam(params: URLSearchParams, name: string, value: string | undefined) {

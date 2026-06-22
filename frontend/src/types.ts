@@ -70,6 +70,13 @@ export type CaptureItemOutcome = {
   created: boolean;
 };
 
+export type LibraryUpdates = {
+  items: LibraryItemSummary[];
+  deleted_item_ids: string[];
+  tags: TagCorpusEntry[];
+  cursor: ApiDateTime;
+};
+
 export type ListItemsFilters = Partial<{
   platform: string;
   tag: string;
@@ -80,6 +87,12 @@ export type ListItemsFilters = Partial<{
   inboxStatus: InboxStatus;
   q: string;
 }>;
+
+export type ListItemUpdatesRequest = ListItemsFilters &
+  Partial<{
+    since: string;
+    limit: number;
+  }>;
 
 export type UpdateItemRequest = Partial<{
   watch_status: WatchStatus;

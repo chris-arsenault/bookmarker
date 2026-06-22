@@ -34,8 +34,6 @@ export function ItemDetail({
   onUpdateItem: (itemId: string, request: UpdateItemRequest) => Promise<LibraryItemDetail>;
   onDeleteItem?: (itemId: string) => Promise<void>;
 }) {
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
   if (!detail) {
     return null;
   }
@@ -69,18 +67,13 @@ export function ItemDetail({
           onUpdateItem={onUpdateItem}
         />
         <DetailActions
-          deleteError={deleteError}
-          deleting={deleting}
           detail={detail}
           onClose={onClose}
           onCopyLink={onCopyLink}
           onDeleteItem={onDeleteItem}
           onOpenSource={onOpenSource}
-          setDeleteError={setDeleteError}
-          setDeleting={setDeleting}
           sourceUrl={sourceUrl}
         />
-        {deleteError ? <p className="form-error">{deleteError}</p> : null}
       </aside>
     </div>
   );
@@ -161,25 +154,17 @@ function DetailTags({ tags }: { tags: ItemTag[] }) {
 function DetailActions({
   detail,
   sourceUrl,
-  deleteError,
-  deleting,
   onClose,
   onCopyLink,
   onOpenSource,
   onDeleteItem,
-  setDeleting,
-  setDeleteError,
 }: {
   detail: LibraryItemDetail;
   sourceUrl: string | null;
-  deleteError: string;
-  deleting: boolean;
   onClose: () => void;
   onCopyLink: (item: LibraryItemDetail["summary"]) => void;
   onOpenSource: (url: string) => void;
   onDeleteItem?: (itemId: string) => Promise<void>;
-  setDeleting: (deleting: boolean) => void;
-  setDeleteError: (message: string) => void;
 }) {
   const { summary } = detail;
   return (
@@ -193,13 +178,10 @@ function DetailActions({
         {itemCopyLabel(summary)}
       </button>
       <DeleteButton
-        deleteError={deleteError}
-        deleting={deleting}
         itemId={summary.id}
+        key={summary.id}
         onDeleted={onClose}
         onDeleteItem={onDeleteItem}
-        setDeleteError={setDeleteError}
-        setDeleting={setDeleting}
       />
     </div>
   );
@@ -207,22 +189,16 @@ function DetailActions({
 
 function DeleteButton({
   itemId,
-  deleteError,
-  deleting,
   onDeleted,
   onDeleteItem,
-  setDeleting,
-  setDeleteError,
 }: {
   itemId: string;
-  deleteError: string;
-  deleting: boolean;
   onDeleted: () => void;
   onDeleteItem?: (itemId: string) => Promise<void>;
-  setDeleting: (deleting: boolean) => void;
-  setDeleteError: (message: string) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   if (!onDeleteItem) {
     return null;
   }
@@ -301,6 +277,7 @@ async function deleteItem(
   setDeleteError("");
   try {
     await onDeleteItem(itemId);
+    setDeleting(false);
     onDeleted();
   } catch (error) {
     setDeleteError(error instanceof Error ? error.message : "Delete failed");

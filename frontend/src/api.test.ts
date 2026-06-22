@@ -39,7 +39,37 @@ describe("ApiClient requests", () => {
 
     expect(calls[0].url).toBe("https://api.example.test/items?inbox_status=organized");
   });
+});
 
+describe("ApiClient update polling", () => {
+  it("api_client_serializes_batched_update_filters", async () => {
+    const calls: CapturedRequest[] = [];
+    const client = new ApiClient({
+      baseUrl: "https://api.example.test/",
+      getAccessToken: async () => "access-token",
+      fetchImpl: captureFetch(
+        calls,
+        jsonResponse({ items: [], deleted_item_ids: [], tags: [], cursor: "2026-06-18T00:00:01Z" })
+      ),
+    });
+
+    await client.listItemUpdates({
+      since: "2026-06-18T00:00:00Z",
+      limit: 25,
+      platform: "YouTube",
+      tag: "Learning",
+      archiveStatus: "pending",
+      inboxStatus: "unsorted",
+      q: "metadata refresh",
+    });
+
+    expect(calls[0].url).toBe(
+      "https://api.example.test/items/updates?since=2026-06-18T00%3A00%3A00Z&limit=25&platform=YouTube&tag=Learning&archive_status=pending&inbox_status=unsorted&q=metadata+refresh"
+    );
+  });
+});
+
+describe("ApiClient organization", () => {
   it("api_client_updates_item_organization", async () => {
     const calls: CapturedRequest[] = [];
     const client = new ApiClient({

@@ -40,6 +40,16 @@ pub trait LibraryService: Send + Sync {
         query: &ListItemsQuery,
     ) -> AppResult<Vec<LibraryItemSummary>>;
 
+    async fn list_item_updates(
+        &self,
+        _user: &UserContext,
+        _query: &ListItemUpdatesQuery,
+    ) -> AppResult<LibraryUpdates> {
+        Err(AppError::Internal(
+            "item updates are not implemented".to_string(),
+        ))
+    }
+
     async fn get_item(&self, user: &UserContext, item_id: Uuid) -> AppResult<LibraryItemDetail>;
 
     async fn list_tag_corpus(&self, user: &UserContext) -> AppResult<Vec<TagCorpusEntry>>;
@@ -114,6 +124,21 @@ pub struct ListItemsQuery {
     pub watch_status: Option<WatchStatus>,
     pub inbox_status: Option<InboxStatus>,
     pub q: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ListItemUpdatesQuery {
+    pub since: Option<OffsetDateTime>,
+    pub limit: i64,
+    pub filters: ListItemsQuery,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LibraryUpdates {
+    pub items: Vec<LibraryItemSummary>,
+    pub deleted_item_ids: Vec<Uuid>,
+    pub tags: Vec<TagCorpusEntry>,
+    pub cursor: OffsetDateTime,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

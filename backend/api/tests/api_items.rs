@@ -8,7 +8,7 @@ use shared::domain::{ArchiveStatus, InboxStatus, ItemKind, WatchStatus};
 use shared::library::{
     InMemoryLibraryService, ItemTag, ItemUrlSummary, LibraryItemDetail, LibraryItemSummary,
 };
-use time::OffsetDateTime;
+use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 use support::{
@@ -86,6 +86,65 @@ async fn items_route_returns_seeded_item_list() {
     let payload = response_json(response).await;
     assert_eq!(payload[0]["id"], item_id.to_string());
     assert_eq!(payload[0]["watch_status"], "unwatched");
+}
+
+#[tokio::test]
+async fn item_updates_route_returns_changed_items_as_a_batch() {
+    let item_id = item_id();
+    let auth = bearer_token("user-sub");
+    let response = request(
+        test_app(seeded_library(item_id)),
+        Method::GET,
+        "/items/updates?since=1969-12-31T00%3A00%3A00Z&limit=10",
+        Some(&auth),
+        Body::empty(),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let payload = response_json(response).await;
+    assert_eq!(payload["items"][0]["id"], item_id.to_string());
+    assert_eq!(payload["items"][0]["title"], "Saved video");
+    assert_eq!(payload["deleted_item_ids"].as_array().unwrap().len(), 0);
+    assert!(payload["cursor"].is_string() || payload["cursor"].is_array());
+}
+
+#[tokio::test]
+async fn item_updates_route_without_since_returns_cursor_only() {
+    let auth = bearer_token("user-sub");
+    let response = request(
+        test_app(seeded_library(item_id())),
+        Method::GET,
+        "/items/updates",
+        Some(&auth),
+        Body::empty(),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let payload = response_json(response).await;
+    assert_eq!(payload["items"].as_array().unwrap().len(), 0);
+    assert_eq!(payload["deleted_item_ids"].as_array().unwrap().len(), 0);
+    assert!(payload["cursor"].is_string() || payload["cursor"].is_array());
+}
+
+#[tokio::test]
+async fn item_updates_route_keeps_cursor_on_limited_batches() {
+    let auth = bearer_token("user-sub");
+    let response = request(
+        test_app(two_item_library()),
+        Method::GET,
+        "/items/updates?since=1969-12-31T00%3A00%3A00Z&limit=1",
+        Some(&auth),
+        Body::empty(),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let payload = response_json(response).await;
+    let cursor: OffsetDateTime = serde_json::from_value(payload["cursor"].clone()).unwrap();
+    assert_eq!(payload["items"].as_array().unwrap().len(), 1);
+    assert_eq!(cursor, OffsetDateTime::UNIX_EPOCH);
 }
 
 #[tokio::test]
@@ -186,6 +245,28 @@ fn filtered_library() -> Arc<InMemoryLibraryService> {
             ),
         ],
     ))
+}
+
+fn two_item_library() -> Arc<InMemoryLibraryService> {
+    Arc::new(InMemoryLibraryService::with_user_items(
+        "user-sub",
+        [
+            timed_item(
+                Uuid::parse_str("00000000-0000-0000-0000-000000000301").unwrap(),
+                OffsetDateTime::UNIX_EPOCH,
+            ),
+            timed_item(
+                Uuid::parse_str("00000000-0000-0000-0000-000000000302").unwrap(),
+                OffsetDateTime::UNIX_EPOCH + Duration::seconds(10),
+            ),
+        ],
+    ))
+}
+
+fn timed_item(item_id: Uuid, created_at: OffsetDateTime) -> LibraryItemDetail {
+    let mut item = filtered_item(item_id, "example", InboxStatus::Unsorted);
+    item.summary.created_at = created_at;
+    item
 }
 
 fn filtered_item(item_id: Uuid, platform: &str, inbox_status: InboxStatus) -> LibraryItemDetail {

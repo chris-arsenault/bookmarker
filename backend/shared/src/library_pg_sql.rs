@@ -29,7 +29,14 @@ pub(super) const ITEM_SELECT: &str = "
         items.watch_status,
         items.inbox_status,
         COALESCE(item_notes.body, '') AS notes,
-        items.created_at
+        items.created_at,
+        GREATEST(
+            items.updated_at,
+            COALESCE(item_urls.updated_at, items.updated_at),
+            COALESCE(item_texts.updated_at, items.updated_at),
+            COALESCE(metadata_snapshots.updated_at, items.updated_at),
+            COALESCE(item_notes.updated_at, items.updated_at)
+        ) AS update_cursor
     FROM items
     LEFT JOIN item_urls ON item_urls.item_id = items.id
     LEFT JOIN item_texts ON item_texts.item_id = items.id
@@ -58,8 +65,48 @@ pub(super) const LIST_ITEMS: &str = "
         OR strpos(lower(COALESCE(metadata_snapshots.title, '')), $9) > 0
         OR strpos(lower(COALESCE(item_notes.body, '')), $9) > 0
         OR strpos(lower(COALESCE(item_texts.plain_text, '')), $9) > 0
-      )
+      )";
+pub(super) const LIST_ITEMS_ORDER: &str = "
     ORDER BY items.created_at DESC, items.id";
+pub(super) const LIST_ITEM_UPDATES: &str = "
+      AND ($2::text IS NULL OR lower(metadata_snapshots.platform) = $2)
+      AND (
+        $3::text IS NULL
+        OR EXISTS (
+            SELECT 1
+            FROM item_tags
+            JOIN tags ON tags.id = item_tags.tag_id
+            WHERE item_tags.item_id = items.id
+              AND (tags.normalized_name = $3 OR lower(tags.display_name) = $3)
+        )
+      )
+      AND ($4::timestamptz IS NULL OR items.created_at >= $4)
+      AND ($5::timestamptz IS NULL OR items.created_at <= $5)
+      AND ($6::text IS NULL OR COALESCE(metadata_snapshots.archive_status, 'pending') = $6)
+      AND ($7::text IS NULL OR items.watch_status = $7)
+      AND ($8::text IS NULL OR items.inbox_status = $8)
+      AND (
+        $9::text IS NULL
+        OR strpos(lower(COALESCE(metadata_snapshots.title, '')), $9) > 0
+        OR strpos(lower(COALESCE(item_notes.body, '')), $9) > 0
+        OR strpos(lower(COALESCE(item_texts.plain_text, '')), $9) > 0
+      )
+      AND GREATEST(
+        items.updated_at,
+        COALESCE(item_urls.updated_at, items.updated_at),
+        COALESCE(item_texts.updated_at, items.updated_at),
+        COALESCE(metadata_snapshots.updated_at, items.updated_at),
+        COALESCE(item_notes.updated_at, items.updated_at)
+      ) > $10
+    ORDER BY update_cursor ASC, items.id
+    LIMIT $11";
+pub(super) const LIST_ITEM_DELETIONS: &str = "
+    SELECT item_id, deleted_at
+    FROM item_deletions
+    WHERE user_id = $1
+      AND deleted_at > $2
+    ORDER BY deleted_at ASC, item_id
+    LIMIT $3";
 pub(super) const GET_ITEM: &str = "
       AND items.id = $2";
 pub(super) const GET_ITEM_BY_CAPTURE_ID: &str = "
@@ -100,6 +147,11 @@ pub(super) const UPSERT_ITEM_NOTE: &str = "
 pub(super) const DELETE_ITEM_TAGS: &str = "
     DELETE FROM item_tags
     WHERE item_id = $1 AND user_id = $2";
+pub(super) const RECORD_ITEM_DELETION: &str = "
+    INSERT INTO item_deletions (user_id, item_id)
+    VALUES ($1, $2)
+    ON CONFLICT (user_id, item_id)
+    DO UPDATE SET deleted_at = now()";
 pub(super) const DELETE_ITEM: &str = "
     DELETE FROM items
     WHERE id = $1 AND user_id = $2";

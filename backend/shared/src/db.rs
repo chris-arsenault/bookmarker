@@ -19,6 +19,10 @@ pub const LINKDROP_TEXT_SNIPPET_MIGRATION: &str =
     include_str!("../../../db/migrations/004_text_snippet_items.sql");
 pub const LINKDROP_TEXT_SNIPPET_ROLLBACK: &str =
     include_str!("../../../db/migrations/rollback/004_text_snippet_items.sql");
+pub const LINKDROP_ITEM_DELETIONS_MIGRATION: &str =
+    include_str!("../../../db/migrations/005_item_deletions.sql");
+pub const LINKDROP_ITEM_DELETIONS_ROLLBACK: &str =
+    include_str!("../../../db/migrations/rollback/005_item_deletions.sql");
 
 pub type DbPool = sqlx::PgPool;
 
@@ -65,12 +69,14 @@ pub(crate) mod tests {
     use super::database_url;
     use super::{
         LINKDROP_CAPTURE_IDEMPOTENCY_MIGRATION, LINKDROP_CAPTURE_IDEMPOTENCY_ROLLBACK,
-        LINKDROP_INBOX_STATUS_MIGRATION, LINKDROP_INBOX_STATUS_ROLLBACK, LINKDROP_MODEL_MIGRATION,
-        LINKDROP_MODEL_ROLLBACK, LINKDROP_TEXT_SNIPPET_MIGRATION, LINKDROP_TEXT_SNIPPET_ROLLBACK,
+        LINKDROP_INBOX_STATUS_MIGRATION, LINKDROP_INBOX_STATUS_ROLLBACK,
+        LINKDROP_ITEM_DELETIONS_MIGRATION, LINKDROP_ITEM_DELETIONS_ROLLBACK,
+        LINKDROP_MODEL_MIGRATION, LINKDROP_MODEL_ROLLBACK, LINKDROP_TEXT_SNIPPET_MIGRATION,
+        LINKDROP_TEXT_SNIPPET_ROLLBACK,
     };
 
     #[test]
-    fn migration_constants_reference_linkdrop_tables() {
+    fn migration_constants_reference_base_model_tables() {
         for table in [
             "users",
             "items",
@@ -85,13 +91,18 @@ pub(crate) mod tests {
             assert!(LINKDROP_MODEL_MIGRATION.contains(&format!("CREATE TABLE {table}")));
             assert!(LINKDROP_MODEL_ROLLBACK.contains(&format!("DROP TABLE IF EXISTS {table}")));
         }
+    }
 
+    #[test]
+    fn migration_constants_reference_incremental_changes() {
         assert!(LINKDROP_CAPTURE_IDEMPOTENCY_MIGRATION.contains("client_capture_id"));
         assert!(LINKDROP_CAPTURE_IDEMPOTENCY_ROLLBACK.contains("client_capture_id"));
         assert!(LINKDROP_INBOX_STATUS_MIGRATION.contains("inbox_status"));
         assert!(LINKDROP_INBOX_STATUS_ROLLBACK.contains("inbox_status"));
         assert!(LINKDROP_TEXT_SNIPPET_MIGRATION.contains("CREATE TABLE item_texts"));
         assert!(LINKDROP_TEXT_SNIPPET_ROLLBACK.contains("DROP TABLE IF EXISTS item_texts"));
+        assert!(LINKDROP_ITEM_DELETIONS_MIGRATION.contains("CREATE TABLE item_deletions"));
+        assert!(LINKDROP_ITEM_DELETIONS_ROLLBACK.contains("DROP TABLE IF EXISTS item_deletions"));
     }
 
     #[test]

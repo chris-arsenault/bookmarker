@@ -9,8 +9,8 @@ use crate::domain::{ArchiveStatus, InboxStatus, WatchStatus};
 use crate::error::{AppError, AppResult};
 use crate::library::{
     CaptureItemOutcome, CaptureItemRequest, ItemTag, LibraryItemDetail, LibraryItemSummary,
-    LibraryService, ListItemsQuery, MergeTagsRequest, RenameTagRequest, TagCorpusEntry,
-    UpdateItemRequest,
+    LibraryService, LibraryUpdates, ListItemUpdatesQuery, ListItemsQuery, MergeTagsRequest,
+    RenameTagRequest, TagCorpusEntry, UpdateItemRequest,
 };
 use crate::library_pg_capture_helpers::validate_tags;
 use crate::url_normalization::{HttpShortUrlResolver, ShortUrlResolver};
@@ -29,6 +29,8 @@ mod library_pg_rows;
 mod library_pg_sql;
 #[path = "library_pg_tag_ops.rs"]
 mod library_pg_tag_ops;
+#[path = "library_pg_updates.rs"]
+mod library_pg_updates;
 
 use library_pg_capture_insert::UrlCaptureRows;
 use library_pg_filters::PgListFilters;
@@ -109,24 +111,73 @@ impl LibraryService for PgLibraryService {
             return Ok(Vec::new());
         };
         let filters = PgListFilters::from(query);
-        let rows: Vec<ItemRow> = sqlx::query_as(&format!("{ITEM_SELECT}{LIST_ITEMS}"))
-            .bind(user_id)
-            .bind(filters.platform.as_deref())
-            .bind(filters.tag.as_deref())
-            .bind(query.created_from)
-            .bind(query.created_to)
-            .bind(filters.archive_status)
-            .bind(filters.watch_status)
-            .bind(filters.inbox_status)
-            .bind(filters.q.as_deref())
-            .fetch_all(&self.db)
-            .await
-            .map_err(database_error)?;
+        let rows: Vec<ItemRow> =
+            sqlx::query_as(&format!("{ITEM_SELECT}{LIST_ITEMS}{LIST_ITEMS_ORDER}"))
+                .bind(user_id)
+                .bind(filters.platform.as_deref())
+                .bind(filters.tag.as_deref())
+                .bind(query.created_from)
+                .bind(query.created_to)
+                .bind(filters.archive_status)
+                .bind(filters.watch_status)
+                .bind(filters.inbox_status)
+                .bind(filters.q.as_deref())
+                .fetch_all(&self.db)
+                .await
+                .map_err(database_error)?;
         let mut items = Vec::with_capacity(rows.len());
         for row in rows {
             items.push(self.detail_from_row(row).await?.summary);
         }
         Ok(items)
+    }
+
+    async fn list_item_updates(
+        &self,
+        user: &UserContext,
+        query: &ListItemUpdatesQuery,
+    ) -> AppResult<LibraryUpdates> {
+        let cursor = time::OffsetDateTime::now_utc();
+        let tags = self.list_tag_corpus(user).await?;
+        let Some(since) = query.since else {
+            return Ok(LibraryUpdates {
+                items: Vec::new(),
+                deleted_item_ids: Vec::new(),
+                tags,
+                cursor,
+            });
+        };
+        let Some(user_id) = self.user_id(user).await? else {
+            return Ok(LibraryUpdates {
+                items: Vec::new(),
+                deleted_item_ids: Vec::new(),
+                tags,
+                cursor,
+            });
+        };
+        let filters = PgListFilters::from(&query.filters);
+        let batch = self
+            .update_batch(
+                user_id,
+                &query.filters,
+                &filters,
+                library_pg_updates::UpdateBatchWindow {
+                    since,
+                    limit: query.limit,
+                    default_cursor: cursor,
+                },
+            )
+            .await?;
+        let mut items = Vec::with_capacity(batch.rows.len());
+        for row in batch.rows {
+            items.push(self.detail_from_row(row).await?.summary);
+        }
+        Ok(LibraryUpdates {
+            items,
+            deleted_item_ids: batch.deleted_item_ids,
+            tags,
+            cursor: batch.cursor,
+        })
     }
 
     async fn get_item(&self, user: &UserContext, item_id: Uuid) -> AppResult<LibraryItemDetail> {

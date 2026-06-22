@@ -7,7 +7,7 @@ use serde::Deserialize;
 use shared::domain::{ArchiveStatus, InboxStatus, WatchStatus};
 use shared::library::{
     CaptureItemOutcome, CaptureItemRequest, CaptureTextRequest, LibraryItemDetail,
-    LibraryItemSummary, ListItemsQuery, UpdateItemRequest,
+    LibraryItemSummary, LibraryUpdates, ListItemUpdatesQuery, ListItemsQuery, UpdateItemRequest,
 };
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
@@ -18,6 +18,7 @@ use crate::{require_user, ApiError, ApiState};
 pub fn router() -> Router<ApiState> {
     Router::new()
         .route("/items", get(list_items).post(capture_item))
+        .route("/items/updates", get(list_item_updates))
         .route("/items/text", post(capture_text))
         .route("/items/{item_id}/thumbnail", get(get_item_thumbnail))
         .route(
@@ -75,6 +76,16 @@ async fn list_items(
     let user = require_user(&state, &headers).await?;
     let query = params.into_query()?;
     Ok(Json(state.library.list_items(&user, &query).await?))
+}
+
+async fn list_item_updates(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Query(params): Query<ListItemUpdatesParams>,
+) -> Result<Json<LibraryUpdates>, ApiError> {
+    let user = require_user(&state, &headers).await?;
+    let query = params.into_query()?;
+    Ok(Json(state.library.list_item_updates(&user, &query).await?))
 }
 
 async fn get_item(
@@ -137,6 +148,20 @@ struct ListItemsParams {
     q: Option<String>,
 }
 
+#[derive(Debug, Default, Deserialize)]
+struct ListItemUpdatesParams {
+    since: Option<String>,
+    limit: Option<i64>,
+    platform: Option<String>,
+    tag: Option<String>,
+    created_from: Option<String>,
+    created_to: Option<String>,
+    archive_status: Option<String>,
+    watch_status: Option<String>,
+    inbox_status: Option<String>,
+    q: Option<String>,
+}
+
 impl ListItemsParams {
     fn into_query(self) -> Result<ListItemsQuery, ApiError> {
         Ok(ListItemsQuery {
@@ -149,6 +174,35 @@ impl ListItemsParams {
             inbox_status: parse_inbox_status(self.inbox_status)?,
             q: clean_param(self.q),
         })
+    }
+}
+
+impl ListItemUpdatesParams {
+    fn into_query(self) -> Result<ListItemUpdatesQuery, ApiError> {
+        Ok(ListItemUpdatesQuery {
+            since: parse_datetime_param("since", self.since)?,
+            limit: update_limit(self.limit)?,
+            filters: ListItemsParams {
+                platform: self.platform,
+                tag: self.tag,
+                created_from: self.created_from,
+                created_to: self.created_to,
+                archive_status: self.archive_status,
+                watch_status: self.watch_status,
+                inbox_status: self.inbox_status,
+                q: self.q,
+            }
+            .into_query()?,
+        })
+    }
+}
+
+fn update_limit(value: Option<i64>) -> Result<i64, ApiError> {
+    const DEFAULT_LIMIT: i64 = 100;
+    const MAX_LIMIT: i64 = 250;
+    match value.unwrap_or(DEFAULT_LIMIT) {
+        limit if limit <= 0 => Err(validation_error("limit must be positive").into()),
+        limit => Ok(limit.min(MAX_LIMIT)),
     }
 }
 

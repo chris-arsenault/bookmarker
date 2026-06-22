@@ -28,6 +28,7 @@ pub(crate) struct ItemRow {
     pub(crate) inbox_status: String,
     pub(crate) notes: String,
     pub(crate) created_at: OffsetDateTime,
+    pub(crate) update_cursor: OffsetDateTime,
 }
 
 impl ItemRow {
