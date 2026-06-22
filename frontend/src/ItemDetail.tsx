@@ -5,8 +5,13 @@ import remarkGfm from "remark-gfm";
 import { formatDate } from "./dateDisplay";
 import { ItemOrganizer } from "./ItemOrganizer";
 import { StatusBadge } from "./StatusBadge";
-import { Thumbnail } from "./Thumbnail";
-import { itemCopyLabel, itemSourceUrl, itemSubtitle, itemTitle } from "./itemDisplay";
+import {
+  itemCopyLabel,
+  itemFetchedTitle,
+  itemSourceUrl,
+  itemSubtitle,
+  itemTitle,
+} from "./itemDisplay";
 import type {
   ItemTag,
   LibraryItemDetail,
@@ -54,7 +59,7 @@ export function ItemDetail({
         {isTextSnippet ? (
           <TextSnippetDetail detail={detail} />
         ) : (
-          <LinkDetailHeading summary={summary} />
+          <LinkDetailHeading sourceUrl={sourceUrl} summary={summary} />
         )}
         {isTextSnippet ? null : <DetailMeta detail={detail} />}
         <DetailTags tags={summary.tags} />
@@ -88,7 +93,7 @@ function TextSnippetDetail({ detail }: { detail: LibraryItemDetail }) {
     <section className="text-detail-summary" aria-label="Saved text">
       <div className="text-detail-heading">
         <p className="eyebrow">Text</p>
-        <h2 id="detail-title">Saved text</h2>
+        <h2 id="detail-title">{itemTitle(summary)}</h2>
         <p>{textSnippetMeta(summary)}</p>
       </div>
       <div className="snippet-body snippet-body-primary markdown-snippet">
@@ -98,16 +103,26 @@ function TextSnippetDetail({ detail }: { detail: LibraryItemDetail }) {
   );
 }
 
-function LinkDetailHeading({ summary }: { summary: LibraryItemSummary }) {
+function LinkDetailHeading({
+  summary,
+  sourceUrl,
+}: {
+  summary: LibraryItemSummary;
+  sourceUrl: string | null;
+}) {
+  const fetchedTitle = itemFetchedTitle(summary);
   return (
-    <>
-      <Thumbnail item={summary} thumbnailUrl={null} />
-      <div className="detail-heading">
-        <StatusBadge status={summary.archive_status} />
-        <h2 id="detail-title">{itemTitle(summary)}</h2>
-        <p>{itemSubtitle(summary)}</p>
-      </div>
-    </>
+    <div className="detail-heading">
+      <StatusBadge status={summary.archive_status} />
+      <h2 id="detail-title">{itemTitle(summary)}</h2>
+      {fetchedTitle ? <p>Fetched title: {fetchedTitle}</p> : null}
+      <p>{itemSubtitle(summary)}</p>
+      {sourceUrl ? (
+        <a className="detail-source-url" href={sourceUrl} rel="noreferrer" target="_blank">
+          {sourceUrl}
+        </a>
+      ) : null}
+    </div>
   );
 }
 

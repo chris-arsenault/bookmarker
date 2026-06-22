@@ -55,6 +55,7 @@ function baseItem() {
   return {
     id: "item-1",
     title: null,
+    fetched_title: null,
     thumbnail_s3_key: null,
     author: null,
     platform: null,

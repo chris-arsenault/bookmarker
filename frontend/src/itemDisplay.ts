@@ -1,7 +1,15 @@
 import type { LibraryItemSummary } from "./types";
 
 export function itemTitle(item: LibraryItemSummary) {
-  return item.title ?? item.text?.preview ?? item.url?.copy_url ?? "Untitled item";
+  return (
+    item.title ?? item.fetched_title ?? item.text?.preview ?? item.url?.copy_url ?? "Untitled item"
+  );
+}
+
+export function itemFetchedTitle(item: LibraryItemSummary) {
+  return item.title && item.fetched_title && item.fetched_title !== item.title
+    ? item.fetched_title
+    : null;
 }
 
 export function itemSubtitle(item: LibraryItemSummary) {

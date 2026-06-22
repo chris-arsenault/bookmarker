@@ -917,6 +917,16 @@ button:disabled {
   color: var(--ink-faint);
 }
 
+.detail-source-url {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--teal);
+}
+
 .text-detail-summary {
   display: grid;
   gap: 0.65rem;
@@ -1908,10 +1918,6 @@ button:disabled {
 .text-detail-modal {
   width: min(46rem, 100%);
   gap: 0.75rem;
-}
-
-.detail-modal > .thumbnail {
-  max-height: 16rem;
 }
 
 .modal-close {

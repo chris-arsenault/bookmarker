@@ -300,6 +300,7 @@ async function createCapture(options: {
 async function textRequest(plainText: string, tags: string[]): Promise<CaptureTextRequest> {
   return {
     plain_text: plainText,
+    title: null,
     html: null,
     source_app: "Bookmarker",
     source_device: await sourceDevice(),

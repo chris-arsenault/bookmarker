@@ -99,6 +99,8 @@ pub struct CaptureItemRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaptureTextRequest {
     pub plain_text: String,
+    #[serde(default)]
+    pub title: Option<String>,
     pub html: Option<String>,
     pub source_app: Option<String>,
     pub source_device: Option<String>,
@@ -148,6 +150,7 @@ pub struct LibraryItemSummary {
     pub url: Option<ItemUrlSummary>,
     pub text: Option<ItemTextSummary>,
     pub title: Option<String>,
+    pub fetched_title: Option<String>,
     pub thumbnail_s3_key: Option<String>,
     pub author: Option<String>,
     pub platform: Option<String>,

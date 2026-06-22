@@ -23,6 +23,10 @@ pub const LINKDROP_ITEM_DELETIONS_MIGRATION: &str =
     include_str!("../../../db/migrations/005_item_deletions.sql");
 pub const LINKDROP_ITEM_DELETIONS_ROLLBACK: &str =
     include_str!("../../../db/migrations/rollback/005_item_deletions.sql");
+pub const LINKDROP_ITEM_TITLES_MIGRATION: &str =
+    include_str!("../../../db/migrations/006_item_titles.sql");
+pub const LINKDROP_ITEM_TITLES_ROLLBACK: &str =
+    include_str!("../../../db/migrations/rollback/006_item_titles.sql");
 
 pub type DbPool = sqlx::PgPool;
 
@@ -71,8 +75,8 @@ pub(crate) mod tests {
         LINKDROP_CAPTURE_IDEMPOTENCY_MIGRATION, LINKDROP_CAPTURE_IDEMPOTENCY_ROLLBACK,
         LINKDROP_INBOX_STATUS_MIGRATION, LINKDROP_INBOX_STATUS_ROLLBACK,
         LINKDROP_ITEM_DELETIONS_MIGRATION, LINKDROP_ITEM_DELETIONS_ROLLBACK,
-        LINKDROP_MODEL_MIGRATION, LINKDROP_MODEL_ROLLBACK, LINKDROP_TEXT_SNIPPET_MIGRATION,
-        LINKDROP_TEXT_SNIPPET_ROLLBACK,
+        LINKDROP_ITEM_TITLES_MIGRATION, LINKDROP_ITEM_TITLES_ROLLBACK, LINKDROP_MODEL_MIGRATION,
+        LINKDROP_MODEL_ROLLBACK, LINKDROP_TEXT_SNIPPET_MIGRATION, LINKDROP_TEXT_SNIPPET_ROLLBACK,
     };
 
     #[test]
@@ -94,15 +98,21 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn migration_constants_reference_incremental_changes() {
+    fn migration_constants_reference_capture_and_text_changes() {
         assert!(LINKDROP_CAPTURE_IDEMPOTENCY_MIGRATION.contains("client_capture_id"));
         assert!(LINKDROP_CAPTURE_IDEMPOTENCY_ROLLBACK.contains("client_capture_id"));
         assert!(LINKDROP_INBOX_STATUS_MIGRATION.contains("inbox_status"));
         assert!(LINKDROP_INBOX_STATUS_ROLLBACK.contains("inbox_status"));
         assert!(LINKDROP_TEXT_SNIPPET_MIGRATION.contains("CREATE TABLE item_texts"));
         assert!(LINKDROP_TEXT_SNIPPET_ROLLBACK.contains("DROP TABLE IF EXISTS item_texts"));
+    }
+
+    #[test]
+    fn migration_constants_reference_later_incremental_changes() {
         assert!(LINKDROP_ITEM_DELETIONS_MIGRATION.contains("CREATE TABLE item_deletions"));
         assert!(LINKDROP_ITEM_DELETIONS_ROLLBACK.contains("DROP TABLE IF EXISTS item_deletions"));
+        assert!(LINKDROP_ITEM_TITLES_MIGRATION.contains("ADD COLUMN title"));
+        assert!(LINKDROP_ITEM_TITLES_ROLLBACK.contains("DROP COLUMN IF EXISTS title"));
     }
 
     #[test]

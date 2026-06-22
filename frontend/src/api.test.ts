@@ -122,6 +122,7 @@ describe("ApiClient text capture", () => {
 
     await client.captureText({
       plain_text: "keep this",
+      title: null,
       html: null,
       source_app: "Terminal",
       source_device: null,
@@ -134,6 +135,7 @@ describe("ApiClient text capture", () => {
     expect(calls[0].method).toBe("POST");
     expect(JSON.parse(calls[0].body ?? "{}")).toEqual({
       plain_text: "keep this",
+      title: null,
       html: null,
       source_app: "Terminal",
       source_device: null,
@@ -269,6 +271,7 @@ function itemSummary(id: string) {
     },
     text: null,
     title: id,
+    fetched_title: null,
     thumbnail_s3_key: null,
     author: null,
     platform: null,

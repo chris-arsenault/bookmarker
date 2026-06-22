@@ -112,7 +112,7 @@ async fn text_capture_route_accepts_snippet_and_lists_item() {
         "/items/text",
         Some(&auth),
         Body::from(
-            r#"{"plain_text":"copy this for later","source_app":"Terminal","tags":["Shell"],"client_capture_id":"text-1"}"#,
+            r#"{"plain_text":"copy this for later","title":"Terminal note","source_app":"Terminal","tags":["Shell"],"client_capture_id":"text-1"}"#,
         ),
     )
     .await;
@@ -124,6 +124,7 @@ async fn text_capture_route_accepts_snippet_and_lists_item() {
         payload["item"]["summary"]["text"]["plain_text"],
         "copy this for later"
     );
+    assert_eq!(payload["item"]["summary"]["title"], "Terminal note");
     assert_eq!(payload["item"]["summary"]["text"]["source_app"], "Terminal");
     assert_eq!(
         payload["item"]["summary"]["archive_status"],

@@ -71,6 +71,7 @@ function item(id: string, archiveStatus: LibraryItemSummary["archive_status"]) {
     },
     text: null,
     title: id,
+    fetched_title: null,
     thumbnail_s3_key: null,
     author: null,
     platform: null,

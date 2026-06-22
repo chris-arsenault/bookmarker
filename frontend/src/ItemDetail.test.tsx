@@ -177,7 +177,7 @@ describe("ItemDetail text snippets", () => {
       );
     });
 
-    expect(container.querySelector("#detail-title")?.textContent).toBe("Saved text");
+    expect(container.querySelector("#detail-title")?.textContent).toBe("Terminal note");
     expect(container.querySelector(".thumbnail")).toBeNull();
     expect(container.querySelector(".status-badge")).toBeNull();
     expect(container.querySelector(".snippet-body-primary")?.textContent).toContain(
@@ -187,6 +187,35 @@ describe("ItemDetail text snippets", () => {
       "first copied line"
     );
     expect(container.querySelector('textarea[name="notes"]')?.getAttribute("rows")).toBe("2");
+    root.unmount();
+    container.remove();
+  });
+});
+
+describe("ItemDetail link heading", () => {
+  it("shows_manual_title_fetched_title_and_url_without_a_preview_box", async () => {
+    const detail = linkDetail("link-visible");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <ItemDetail
+          availableTags={[]}
+          detail={detail}
+          onClose={() => undefined}
+          onCopyLink={() => undefined}
+          onOpenSource={() => undefined}
+          onUpdateItem={async () => detail}
+        />
+      );
+    });
+
+    expect(container.querySelector(".thumbnail")).toBeNull();
+    expect(container.querySelector("#detail-title")?.textContent).toBe("Saved link");
+    expect(container.textContent).toContain("Fetched title: Resolved metadata title");
+    expect(container.textContent).toContain("https://example.com/link-visible");
     root.unmount();
     container.remove();
   });
@@ -206,7 +235,8 @@ const itemDetail: LibraryItemDetail = {
       source_device: null,
       capture_method: "desktop_clipboard",
     },
-    title: null,
+    title: "Terminal note",
+    fetched_title: null,
     thumbnail_s3_key: null,
     author: null,
     platform: null,
@@ -255,6 +285,7 @@ function linkDetail(id: string): LibraryItemDetail {
       },
       text: null,
       title: "Saved link",
+      fetched_title: "Resolved metadata title",
       archive_status: "pending",
     },
   };

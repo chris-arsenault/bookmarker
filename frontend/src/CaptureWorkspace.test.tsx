@@ -43,6 +43,7 @@ describe("CaptureWorkspace text capture", () => {
     expect(textRequests).toHaveLength(1);
     expect(textRequests[0]).toMatchObject({
       plain_text: "copy this terminal output",
+      title: null,
       source_app: "Bookmarker",
       capture_method: "desktop_manual",
       tags: ["Research", "Shell"],
@@ -204,6 +205,7 @@ function itemDetail(id: string): LibraryItemDetail {
         capture_method: "desktop_manual",
       },
       title: null,
+      fetched_title: null,
       thumbnail_s3_key: null,
       author: null,
       platform: null,

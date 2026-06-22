@@ -33,6 +33,7 @@ export type LibraryItemSummary = {
   url: ItemUrlSummary | null;
   text: ItemTextSummary | null;
   title: string | null;
+  fetched_title: string | null;
   thumbnail_s3_key: string | null;
   author: string | null;
   platform: string | null;
@@ -103,6 +104,7 @@ export type UpdateItemRequest = Partial<{
 
 export type CaptureTextRequest = {
   plain_text: string;
+  title: string | null;
   html: string | null;
   source_app: string | null;
   source_device: string | null;

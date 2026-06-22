@@ -157,6 +157,7 @@ fn seeded_library(item_id: Uuid) -> Arc<InMemoryLibraryService> {
                 )),
                 text: None,
                 title: Some("Saved video".to_string()),
+                fetched_title: None,
                 thumbnail_s3_key: None,
                 author: Some("Creator".to_string()),
                 platform: Some("example".to_string()),

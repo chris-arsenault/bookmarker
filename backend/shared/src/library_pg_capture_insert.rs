@@ -6,10 +6,7 @@ use crate::domain::{ItemKind, TagName};
 use crate::error::AppResult;
 use crate::url_normalization::NormalizedUrl;
 
-use super::{
-    database_error, INSERT_CAPTURE_ITEM, INSERT_CAPTURE_TITLE, INSERT_CAPTURE_URL, INSERT_ITEM_TAG,
-    UPSERT_TAG,
-};
+use super::{database_error, INSERT_CAPTURE_ITEM, INSERT_CAPTURE_URL, INSERT_ITEM_TAG, UPSERT_TAG};
 
 pub(super) struct UrlCaptureRows<'a> {
     pub(super) user_id: Uuid,
@@ -30,7 +27,6 @@ pub(super) async fn insert_capture(
         transaction.rollback().await.map_err(database_error)?;
         return Ok(None);
     }
-    insert_capture_title(&mut transaction, item_id, input.user_id, input.title).await?;
     insert_capture_tags(&mut transaction, item_id, input.user_id, input.tags).await?;
     transaction.commit().await.map_err(database_error)?;
     Ok(Some(item_id))
@@ -44,6 +40,7 @@ async fn insert_capture_item(
         .bind(input.user_id)
         .bind(input.client_capture_id)
         .bind(ItemKind::Url.as_str())
+        .bind(input.title)
         .fetch_one(&mut **transaction)
         .await
         .map_err(database_error)
@@ -65,24 +62,6 @@ async fn insert_capture_url(
         .await
         .map_err(database_error)?;
     Ok(result.rows_affected() > 0)
-}
-
-async fn insert_capture_title(
-    transaction: &mut Transaction<'_, Postgres>,
-    item_id: Uuid,
-    user_id: Uuid,
-    title: Option<&str>,
-) -> AppResult<()> {
-    if let Some(title) = title {
-        sqlx::query(INSERT_CAPTURE_TITLE)
-            .bind(item_id)
-            .bind(user_id)
-            .bind(title)
-            .execute(&mut **transaction)
-            .await
-            .map_err(database_error)?;
-    }
-    Ok(())
 }
 
 async fn insert_capture_tags(

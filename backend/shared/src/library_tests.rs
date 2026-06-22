@@ -23,6 +23,7 @@ fn item(id: Uuid) -> LibraryItemDetail {
             )),
             text: None,
             title: Some("Example".to_string()),
+            fetched_title: None,
             thumbnail_s3_key: None,
             author: None,
             platform: None,
@@ -249,6 +250,7 @@ async fn in_memory_capture_accepts_text_snippet() {
             &user(),
             CaptureTextRequest {
                 plain_text: " Keep this snippet nearby ".to_string(),
+                title: Some(" Snippet title ".to_string()),
                 html: None,
                 source_app: Some("Editor".to_string()),
                 source_device: Some("laptop".to_string()),
@@ -262,6 +264,7 @@ async fn in_memory_capture_accepts_text_snippet() {
 
     assert!(outcome.created);
     assert_eq!(outcome.item.summary.item_kind, ItemKind::TextSnippet);
+    assert_eq!(outcome.item.summary.title.as_deref(), Some("Snippet title"));
     assert_eq!(
         outcome.item.summary.text.as_ref().unwrap().plain_text,
         " Keep this snippet nearby "

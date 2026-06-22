@@ -17,7 +17,8 @@ pub(super) const ITEM_SELECT: &str = "
         item_texts.source_app,
         item_texts.source_device,
         item_texts.capture_method,
-        metadata_snapshots.title,
+        items.title,
+        metadata_snapshots.title AS fetched_title,
         metadata_snapshots.thumbnail_s3_key,
         metadata_snapshots.author,
         metadata_snapshots.platform,
@@ -62,6 +63,7 @@ pub(super) const LIST_ITEMS: &str = "
       AND ($8::text IS NULL OR items.inbox_status = $8)
       AND (
         $9::text IS NULL
+        OR strpos(lower(COALESCE(items.title, '')), $9) > 0
         OR strpos(lower(COALESCE(metadata_snapshots.title, '')), $9) > 0
         OR strpos(lower(COALESCE(item_notes.body, '')), $9) > 0
         OR strpos(lower(COALESCE(item_texts.plain_text, '')), $9) > 0
@@ -87,6 +89,7 @@ pub(super) const LIST_ITEM_UPDATES: &str = "
       AND ($8::text IS NULL OR items.inbox_status = $8)
       AND (
         $9::text IS NULL
+        OR strpos(lower(COALESCE(items.title, '')), $9) > 0
         OR strpos(lower(COALESCE(metadata_snapshots.title, '')), $9) > 0
         OR strpos(lower(COALESCE(item_notes.body, '')), $9) > 0
         OR strpos(lower(COALESCE(item_texts.plain_text, '')), $9) > 0
@@ -156,8 +159,8 @@ pub(super) const DELETE_ITEM: &str = "
     DELETE FROM items
     WHERE id = $1 AND user_id = $2";
 pub(super) const INSERT_CAPTURE_ITEM: &str = "
-    INSERT INTO items (user_id, client_capture_id, item_kind)
-    VALUES ($1, $2, $3)
+    INSERT INTO items (user_id, client_capture_id, item_kind, title)
+    VALUES ($1, $2, $3, $4)
     RETURNING id";
 pub(super) const INSERT_CAPTURE_URL: &str = "
     INSERT INTO item_urls (
@@ -172,15 +175,6 @@ pub(super) const INSERT_CAPTURE_URL: &str = "
     ON CONFLICT (user_id, canonical_url)
     WHERE canonical_url IS NOT NULL
     DO NOTHING";
-pub(super) const INSERT_CAPTURE_TITLE: &str = "
-    INSERT INTO metadata_snapshots (
-        item_id,
-        user_id,
-        title,
-        archive_status,
-        captured_at
-    )
-    VALUES ($1, $2, $3, 'pending', now())";
 pub(super) const INSERT_TEXT_CAPTURE: &str = "
     INSERT INTO item_texts (
         item_id,

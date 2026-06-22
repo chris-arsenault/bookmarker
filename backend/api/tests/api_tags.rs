@@ -127,6 +127,7 @@ fn item_with_tags(item_id: Uuid, tags: Vec<ItemTag>) -> LibraryItemDetail {
             )),
             text: None,
             title: Some("Saved video".to_string()),
+            fetched_title: None,
             thumbnail_s3_key: None,
             author: Some("Creator".to_string()),
             platform: Some("example".to_string()),

@@ -113,6 +113,7 @@ const textItem: LibraryItemSummary = {
     capture_method: "desktop_clipboard",
   },
   title: null,
+  fetched_title: null,
   thumbnail_s3_key: null,
   author: null,
   platform: null,

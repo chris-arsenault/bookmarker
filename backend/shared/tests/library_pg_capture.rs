@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use shared::auth::UserContext;
 use shared::db::{
     LINKDROP_CAPTURE_IDEMPOTENCY_MIGRATION, LINKDROP_INBOX_STATUS_MIGRATION,
-    LINKDROP_MODEL_MIGRATION, LINKDROP_TEXT_SNIPPET_MIGRATION,
+    LINKDROP_ITEM_TITLES_MIGRATION, LINKDROP_MODEL_MIGRATION, LINKDROP_TEXT_SNIPPET_MIGRATION,
 };
 use shared::domain::ArchiveStatus;
 use shared::library::{CaptureItemOutcome, CaptureItemRequest, LibraryService, ListItemsQuery};
@@ -158,6 +158,7 @@ async fn pg_capture_text_persists_snippet_and_deduplicates_by_hash() {
             &user(),
             shared::library::CaptureTextRequest {
                 plain_text: "clipboard note".to_string(),
+                title: Some(" Terminal note ".to_string()),
                 html: None,
                 source_app: Some("Terminal".to_string()),
                 source_device: None,
@@ -187,6 +188,7 @@ async fn pg_capture_text_persists_snippet_and_deduplicates_by_hash() {
         first.item.summary.archive_status,
         ArchiveStatus::NotApplicable
     );
+    assert_eq!(first.item.summary.title.as_deref(), Some("Terminal note"));
     assert_eq!(
         first
             .item
@@ -323,6 +325,7 @@ fn assert_failed_short_url_saved(failed_short: &CaptureItemOutcome) {
 fn text_request(plain_text: &str) -> shared::library::CaptureTextRequest {
     shared::library::CaptureTextRequest {
         plain_text: plain_text.to_string(),
+        title: None,
         html: None,
         source_app: None,
         source_device: None,
@@ -355,6 +358,7 @@ fn apply_migrations(container_name: &str) {
     run_psql(container_name, LINKDROP_CAPTURE_IDEMPOTENCY_MIGRATION);
     run_psql(container_name, LINKDROP_INBOX_STATUS_MIGRATION);
     run_psql(container_name, LINKDROP_TEXT_SNIPPET_MIGRATION);
+    run_psql(container_name, LINKDROP_ITEM_TITLES_MIGRATION);
 }
 
 fn run_psql(container_name: &str, sql: &str) {

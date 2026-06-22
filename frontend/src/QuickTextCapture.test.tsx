@@ -28,12 +28,14 @@ describe("QuickTextCapture text mode", () => {
       );
     });
 
+    await setInput(container, "quick-title", "Shell note");
     await setTextarea(container, "remember this shell output");
     await submitForm(container);
 
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({
       plain_text: "remember this shell output",
+      title: "Shell note",
       tags: [],
       capture_method: "desktop_manual",
     });
@@ -97,7 +99,7 @@ describe("QuickTextCapture link mode", () => {
     });
 
     await chooseMode(container, "link");
-    await setInput(container, "quick-link-title", "Example article");
+    await setInput(container, "quick-title", "Example article");
     await setInput(container, "quick-url", " https://example.com/read ");
     await clickButton(container, "Work");
     await submitForm(container);
@@ -231,7 +233,7 @@ function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement, value: 
 }
 
 async function createLinkNoop(request: CaptureLinkRequest): Promise<CaptureItemOutcome> {
-  return linkItemDetail(request);
+  return { created: true, item: linkItemDetail(request) };
 }
 
 const tagCorpus = [
@@ -264,7 +266,8 @@ function textItemDetail(request: CaptureTextRequest) {
         source_device: null,
         capture_method: "desktop_manual",
       },
-      title: null,
+      title: request.title,
+      fetched_title: null,
       thumbnail_s3_key: null,
       author: null,
       platform: null,
@@ -290,7 +293,8 @@ function linkItemDetail(request: CaptureLinkRequest) {
         copy_url: request.url,
       },
       text: null,
-      title: request.title ?? request.url,
+      title: request.title,
+      fetched_title: null,
       thumbnail_s3_key: null,
       author: null,
       platform: null,

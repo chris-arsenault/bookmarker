@@ -4,7 +4,8 @@ mod sqlx_support;
 use shared::auth::UserContext;
 use shared::db::{
     LINKDROP_CAPTURE_IDEMPOTENCY_MIGRATION, LINKDROP_INBOX_STATUS_MIGRATION,
-    LINKDROP_ITEM_DELETIONS_MIGRATION, LINKDROP_MODEL_MIGRATION, LINKDROP_TEXT_SNIPPET_MIGRATION,
+    LINKDROP_ITEM_DELETIONS_MIGRATION, LINKDROP_ITEM_TITLES_MIGRATION, LINKDROP_MODEL_MIGRATION,
+    LINKDROP_TEXT_SNIPPET_MIGRATION,
 };
 use shared::library::{LibraryService, ListItemUpdatesQuery, ListItemsQuery};
 use shared::library_pg::PgLibraryService;
@@ -37,7 +38,11 @@ async fn pg_item_updates_include_metadata_snapshot_changes() {
 
     assert_eq!(updates.items.len(), 1);
     assert_eq!(updates.items[0].id, item_id);
-    assert_eq!(updates.items[0].title.as_deref(), Some("Updated title"));
+    assert_eq!(updates.items[0].title, None);
+    assert_eq!(
+        updates.items[0].fetched_title.as_deref(),
+        Some("Updated title")
+    );
     assert!(updates.deleted_item_ids.is_empty());
 }
 
@@ -130,6 +135,7 @@ fn apply_migrations(container_name: &str) {
     run_psql(container_name, LINKDROP_INBOX_STATUS_MIGRATION);
     run_psql(container_name, LINKDROP_TEXT_SNIPPET_MIGRATION);
     run_psql(container_name, LINKDROP_ITEM_DELETIONS_MIGRATION);
+    run_psql(container_name, LINKDROP_ITEM_TITLES_MIGRATION);
 }
 
 fn run_psql(container_name: &str, sql: &str) {

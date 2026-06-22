@@ -10,7 +10,26 @@ const TRACKING_PARAM_PREFIXES: &[&str] = &["utm_"];
 const TRACKING_PARAM_NAMES: &[&str] = &[
     "fbclid", "gclid", "gbraid", "wbraid", "mc_cid", "mc_eid", "igshid", "_hsenc", "_hsmi",
 ];
-const TIKTOK_SHORT_HOSTS: &[&str] = &["vt.tiktok.com", "vm.tiktok.com"];
+const RESOLVABLE_SHORT_HOSTS: &[&str] = &[
+    "a.co",
+    "amzn.to",
+    "bit.ly",
+    "buff.ly",
+    "cutt.ly",
+    "goo.gl",
+    "ift.tt",
+    "is.gd",
+    "lnkd.in",
+    "ow.ly",
+    "rebrand.ly",
+    "share.google.com",
+    "shorturl.at",
+    "t.co",
+    "tinyurl.com",
+    "trib.al",
+    "vm.tiktok.com",
+    "vt.tiktok.com",
+];
 const YOUTUBE_SHORT_HOST: &str = "youtu.be";
 const YOUTUBE_WATCH_URL: &str = "https://www.youtube.com/watch";
 const HTTP_TIMEOUT: Duration = Duration::from_secs(5);
@@ -190,7 +209,7 @@ fn is_youtube_short_url(url: &Url) -> bool {
 
 fn should_resolve_short_url(url: &Url) -> bool {
     url.host_str().is_some_and(|host| {
-        TIKTOK_SHORT_HOSTS
+        RESOLVABLE_SHORT_HOSTS
             .iter()
             .any(|short_host| host.eq_ignore_ascii_case(short_host))
     })
@@ -253,6 +272,37 @@ mod tests {
         assert_eq!(
             failed.normalization_error.as_deref(),
             Some("short URL resolution failed: no redirect")
+        );
+    }
+
+    #[tokio::test]
+    async fn resolves_share_google_links_before_storing() {
+        let resolver =
+            FakeResolver::succeeds_with("https://example.com/doc?utm_source=share&keep=1");
+
+        let normalized =
+            normalize_url_with_resolver("https://share.google.com/example-doc", &resolver).await;
+
+        assert_eq!(normalized.normalization_status, ArchiveStatus::Succeeded);
+        assert_eq!(normalized.normalization_error, None);
+        assert_eq!(
+            normalized.canonical_url.as_deref(),
+            Some("https://example.com/doc?keep=1")
+        );
+    }
+
+    #[tokio::test]
+    async fn resolves_known_generic_shorteners_before_storing() {
+        let resolver = FakeResolver::succeeds_with(
+            "https://target.example/read?utm_campaign=share&section=intro",
+        );
+
+        let normalized = normalize_url_with_resolver("https://bit.ly/fake", &resolver).await;
+
+        assert_eq!(normalized.normalization_status, ArchiveStatus::Succeeded);
+        assert_eq!(
+            normalized.canonical_url.as_deref(),
+            Some("https://target.example/read?section=intro")
         );
     }
 

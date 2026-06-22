@@ -21,12 +21,14 @@ data class CaptureAttempt(
 
 data class CaptureTextAttempt(
     val plainText: String,
+    val title: String? = null,
     val tags: List<String> = emptyList(),
     val clientCaptureId: String = UUID.randomUUID().toString(),
 ) {
     fun toJson(): String =
         JSONObject()
             .put("plain_text", plainText)
+            .put("title", title ?: JSONObject.NULL)
             .put("html", JSONObject.NULL)
             .put("source_app", "Android share")
             .put("source_device", "android")

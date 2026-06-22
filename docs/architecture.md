@@ -62,9 +62,10 @@ instead of creating another pending item.
 
 M4 normalizes URLs during capture for storage, deduplication, and copy behavior.
 Tracking parameters are stripped, `youtu.be` is converted without network
-access, and TikTok short links such as `vt.tiktok.com` are resolved through a
-bounded best-effort resolver. If short-link resolution fails, capture still saves
-the item with the original URL and a `copy_url` fallback.
+access, and share/meta or short-link hosts such as `share.google.com`,
+`vt.tiktok.com`, and common shorteners are resolved through a bounded
+best-effort resolver. If short-link resolution fails, capture still saves the
+item with the original URL and a `copy_url` fallback.
 
 M5 processing updates the same record after metadata enrichment and snapshot
 archival. The API queues processing best effort after capture commits; dispatch
@@ -74,6 +75,11 @@ The tag corpus is derived from explicit item-tag associations. Chip ranking uses
 usage counts from that corpus and starts empty on a new install. New captures
 land with `inbox_status = unsorted`; `organized` is set later by deliberate
 user action.
+
+User-entered titles live on `items.title` for both URL captures and text
+snippets. Fetched provider titles live separately as `metadata_snapshots.title`
+and are surfaced to clients as `fetched_title`, so enrichment never overwrites a
+capture-time title.
 
 ## Database and domain model
 
@@ -105,10 +111,10 @@ duplicates. API item summaries and detail responses include `copy_url`, which is
 the canonical URL when present and the original URL when normalization is failed
 or pending.
 
-Thumbnail, title, author/channel, platform, duration, and archive status are
-stored as snapshot fields in `metadata_snapshots`. The processing Lambda fetches
-metadata best effort, writes `archive_status` as `pending`, `succeeded`, or
-`failed`, and leaves failed sources saved and queryable. When a thumbnail is
+Thumbnail, fetched title, author/channel, platform, duration, and archive status
+are stored as snapshot fields in `metadata_snapshots`. The processing Lambda
+fetches metadata best effort, writes `archive_status` as `pending`, `succeeded`,
+or `failed`, and leaves failed sources saved and queryable. When a thumbnail is
 available, it is downloaded and stored through a Linkdrop-owned snapshot store;
 the database keeps `thumbnail_s3_key` and content type, not the source thumbnail
 hotlink. Web clients read thumbnails through the authenticated API, which checks
@@ -121,7 +127,7 @@ text snippets in one feed/detail panel with title/preview, platform/source app,
 explicit tags, date added, `archive_status`, watched status, `inbox_status`,
 notes, and API-mediated thumbnail snapshots when available. It supports filters
 for platform, explicit tag, added date range, archive status, watched status,
-inbox status, and free-text title/snippet/notes search.
+inbox status, and free-text user-title/fetched-title/snippet/notes search.
 
 Item actions open the source link for URL items, copy `url.copy_url` for URL
 items, and copy `text.plain_text` for text snippets. M6 uses source deep-links

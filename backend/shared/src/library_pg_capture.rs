@@ -166,11 +166,13 @@ async fn insert_text_capture(
     input: TextCaptureInsert,
 ) -> AppResult<CaptureItemOutcome> {
     let tags = validate_tags(&input.request.tags)?;
+    let title = clean_optional(input.request.title.clone());
     let mut transaction = service.db.begin().await.map_err(database_error)?;
     let item_id = insert_text_item(
         &mut transaction,
         input.user_id,
         input.client_capture_id.as_deref(),
+        title.as_deref(),
     )
     .await?;
     let inserted = insert_text_payload(&mut transaction, item_id, input.user_id, &input).await?;
@@ -190,11 +192,13 @@ async fn insert_text_item(
     transaction: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
     client_capture_id: Option<&str>,
+    title: Option<&str>,
 ) -> AppResult<Uuid> {
     sqlx::query_scalar(INSERT_CAPTURE_ITEM)
         .bind(user_id)
         .bind(client_capture_id)
         .bind(ItemKind::TextSnippet.as_str())
+        .bind(title)
         .fetch_one(&mut **transaction)
         .await
         .map_err(database_error)

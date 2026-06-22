@@ -66,6 +66,7 @@ async fn items_route_returns_seeded_item_detail() {
     let payload = response_json(response).await;
     assert_eq!(payload["summary"]["id"], item_id.to_string());
     assert_eq!(payload["summary"]["title"], "Saved video");
+    assert_eq!(payload["summary"]["fetched_title"], "Fetched video");
     assert_eq!(payload["notes"], "watch for API shape");
 }
 
@@ -85,6 +86,7 @@ async fn items_route_returns_seeded_item_list() {
     assert_eq!(response.status(), StatusCode::OK);
     let payload = response_json(response).await;
     assert_eq!(payload[0]["id"], item_id.to_string());
+    assert_eq!(payload[0]["fetched_title"], "Fetched video");
     assert_eq!(payload[0]["watch_status"], "unwatched");
 }
 
@@ -105,6 +107,7 @@ async fn item_updates_route_returns_changed_items_as_a_batch() {
     let payload = response_json(response).await;
     assert_eq!(payload["items"][0]["id"], item_id.to_string());
     assert_eq!(payload["items"][0]["title"], "Saved video");
+    assert_eq!(payload["items"][0]["fetched_title"], "Fetched video");
     assert_eq!(payload["deleted_item_ids"].as_array().unwrap().len(), 0);
     assert!(payload["cursor"].is_string() || payload["cursor"].is_array());
 }
@@ -214,6 +217,7 @@ fn seeded_library(item_id: Uuid) -> Arc<InMemoryLibraryService> {
                 )),
                 text: None,
                 title: Some("Saved video".to_string()),
+                fetched_title: Some("Fetched video".to_string()),
                 thumbnail_s3_key: None,
                 author: Some("Creator".to_string()),
                 platform: Some("example".to_string()),
@@ -280,6 +284,7 @@ fn filtered_item(item_id: Uuid, platform: &str, inbox_status: InboxStatus) -> Li
             )),
             text: None,
             title: Some("Rust async talk".to_string()),
+            fetched_title: None,
             thumbnail_s3_key: None,
             author: Some("Creator".to_string()),
             platform: Some(platform.to_string()),

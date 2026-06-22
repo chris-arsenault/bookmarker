@@ -310,6 +310,7 @@ impl InMemoryLibraryService {
                 url: Some(ItemUrlSummary::new(original_url, canonical_url)),
                 text: None,
                 title,
+                fetched_title: None,
                 thumbnail_s3_key: None,
                 author: None,
                 platform: None,

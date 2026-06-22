@@ -1,0 +1,5 @@
+ALTER TABLE items
+DROP CONSTRAINT IF EXISTS items_title_not_empty;
+
+ALTER TABLE items
+DROP COLUMN IF EXISTS title;

@@ -72,6 +72,7 @@ fn matches_text(item: &LibraryItemDetail, query: Option<&str>) -> bool {
         return true;
     };
     contains_text(item.summary.title.as_deref(), &query)
+        || contains_text(item.summary.fetched_title.as_deref(), &query)
         || contains_text(
             item.summary
                 .text

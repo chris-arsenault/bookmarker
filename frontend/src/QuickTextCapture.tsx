@@ -28,7 +28,7 @@ export function QuickTextCapture({
   const [mode, setMode] = useState<CaptureMode>("text");
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
-  const [linkTitle, setLinkTitle] = useState("");
+  const [title, setTitle] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -42,14 +42,14 @@ export function QuickTextCapture({
       mode,
       text,
       url,
-      linkTitle,
+      title,
       tagInput,
       selectedTags,
       onCreateText,
       onCreateLink,
       setText,
       setUrl,
-      setLinkTitle,
+      setTitle,
       setTagInput,
       setSelectedTags,
       setSaving,
@@ -66,10 +66,10 @@ export function QuickTextCapture({
           mode={mode}
           setText={setText}
           setUrl={setUrl}
-          setLinkTitle={setLinkTitle}
+          setTitle={setTitle}
           text={text}
+          title={title}
           url={url}
-          linkTitle={linkTitle}
         />
         <QuickCaptureActions
           canSave={canSaveDraft(mode, text, url)}
@@ -98,24 +98,32 @@ function QuickCaptureField({
   mode,
   text,
   url,
-  linkTitle,
+  title,
   disabled,
   setText,
   setUrl,
-  setLinkTitle,
+  setTitle,
 }: {
   mode: CaptureMode;
   text: string;
   url: string;
-  linkTitle: string;
+  title: string;
   disabled: boolean;
   setText: (value: string) => void;
   setUrl: (value: string) => void;
-  setLinkTitle: (value: string) => void;
+  setTitle: (value: string) => void;
 }) {
   return (
     <label className="quick-field">
       <span>New item</span>
+      <input
+        aria-label="New item title"
+        disabled={disabled}
+        name="quick-title"
+        onChange={(event) => setTitle(event.currentTarget.value)}
+        placeholder="Title"
+        value={title}
+      />
       {mode === "text" ? (
         <textarea
           aria-label="New text item"
@@ -127,14 +135,6 @@ function QuickCaptureField({
         />
       ) : (
         <div className="quick-link-fields">
-          <input
-            aria-label="New link title"
-            disabled={disabled}
-            name="quick-link-title"
-            onChange={(event) => setLinkTitle(event.currentTarget.value)}
-            placeholder="Title"
-            value={linkTitle}
-          />
           <input
             aria-label="New link URL"
             disabled={disabled}
@@ -204,14 +204,14 @@ async function saveCapture(options: {
   mode: CaptureMode;
   text: string;
   url: string;
-  linkTitle: string;
+  title: string;
   tagInput: string;
   selectedTags: string[];
   onCreateText: (request: CaptureTextRequest) => Promise<CaptureItemOutcome>;
   onCreateLink: (request: CaptureLinkRequest) => Promise<CaptureItemOutcome>;
   setText: (value: string) => void;
   setUrl: (value: string) => void;
-  setLinkTitle: (value: string) => void;
+  setTitle: (value: string) => void;
   setTagInput: (value: string) => void;
   setSelectedTags: (tags: string[]) => void;
   setSaving: (saving: boolean) => void;
@@ -242,7 +242,7 @@ async function createCapture(options: {
   mode: CaptureMode;
   text: string;
   url: string;
-  linkTitle: string;
+  title: string;
   tagInput: string;
   selectedTags: string[];
   onCreateText: (request: CaptureTextRequest) => Promise<CaptureItemOutcome>;
@@ -250,9 +250,9 @@ async function createCapture(options: {
 }) {
   const tags = selectedTagValues(options.selectedTags, options.tagInput);
   if (options.mode === "text") {
-    return options.onCreateText(await textRequest(options.text, tags));
+    return options.onCreateText(await textRequest(options.text, options.title, tags));
   }
-  return options.onCreateLink(linkRequest(options.url.trim(), options.linkTitle, tags));
+  return options.onCreateLink(linkRequest(options.url.trim(), options.title, tags));
 }
 
 function saveErrorMessage(error: unknown) {
@@ -260,9 +260,14 @@ function saveErrorMessage(error: unknown) {
   return message ? `Save failed: ${message}` : "Save failed: unknown error";
 }
 
-async function textRequest(plainText: string, tags: string[]): Promise<CaptureTextRequest> {
+async function textRequest(
+  plainText: string,
+  title: string,
+  tags: string[]
+): Promise<CaptureTextRequest> {
   return {
     plain_text: plainText,
+    title: optionalString(title),
     html: null,
     source_app: "Bookmarker",
     source_device: (await desktopBridge()?.platform()) ?? null,
@@ -320,7 +325,7 @@ function clearDraft(options: {
   mode: CaptureMode;
   setText: (value: string) => void;
   setUrl: (value: string) => void;
-  setLinkTitle: (value: string) => void;
+  setTitle: (value: string) => void;
   setTagInput: (value: string) => void;
   setSelectedTags: (tags: string[]) => void;
 }) {
@@ -328,8 +333,8 @@ function clearDraft(options: {
     options.setText("");
   } else {
     options.setUrl("");
-    options.setLinkTitle("");
   }
+  options.setTitle("");
   options.setTagInput("");
   options.setSelectedTags([]);
 }

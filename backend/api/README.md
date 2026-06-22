@@ -33,21 +33,25 @@ applied by the shared API router layer.
 ```json
 {
   "url": "https://example.com/watch",
+  "title": "My saved title",
   "tags": ["Learning"],
   "client_capture_id": "android-share-attempt-id"
 }
 ```
 
-`tags` is optional and defaults to an empty list. Tags are stored only when the
-user explicitly supplies them. `client_capture_id` is optional, but Android uses
-one stable value per share attempt so a retry returns the existing item with
-`200 OK` instead of creating a duplicate. New captures return `201 Created`.
+`title` and `tags` are optional. `title` stores the user-entered capture title on
+the item itself; enrichment writes provider metadata to `fetched_title` instead
+of overwriting it. Tags are stored only when the user explicitly supplies them.
+`client_capture_id` is optional, but Android uses one stable value per share
+attempt so a retry returns the existing item with `200 OK` instead of creating a
+duplicate. New captures return `201 Created`.
 
 `POST /items/text` accepts:
 
 ```json
 {
   "plain_text": "clipboard text to keep nearby",
+  "title": "Shell note",
   "html": null,
   "source_app": "Desktop",
   "source_device": "linux",
@@ -60,15 +64,16 @@ one stable value per share attempt so a retry returns the existing item with
 Text captures share the same `items`, explicit tags, notes, watched status, and
 inbox status as URL captures. They store payload-specific data in `item_texts`,
 deduplicate repeated text content by per-user content hash, and return
-`archive_status = not_applicable`.
+`archive_status = not_applicable`. Text capture `title` is optional and uses the
+same user-entered item title field as URL captures.
 
 URL capture responses include `summary.url.original_url`,
 `summary.url.canonical_url` when available, and `summary.url.copy_url`.
 `copy_url` is the canonical URL after tracking parameters are stripped and
-short-share hosts such as `youtu.be` or best-effort `vt.tiktok.com` redirects
-are normalized; if normalization fails, `copy_url` falls back to the original
-URL. Repeated captures with the same canonical URL return the existing item
-with `200 OK`.
+short-share hosts such as `youtu.be`, `share.google.com`, `vt.tiktok.com`, and
+common shorteners are normalized or resolved best effort; if normalization
+fails, `copy_url` falls back to the original URL. Repeated captures with the
+same canonical URL return the existing item with `200 OK`.
 
 After a created, retry-returned, or deduplicated capture is surfaced, the API
 enqueues an `enrich_metadata` processing job. When `PROCESSING_FUNCTION_NAME` is
@@ -88,11 +93,12 @@ body.
 | `archive_status` | `pending`, `succeeded`, `failed`, or `not_applicable`; URL items without snapshot rows read as `pending` |
 | `watch_status` | `unwatched` or `watched` |
 | `inbox_status` | `unsorted` or `organized` |
-| `q` | Case-insensitive search over snapshot title, snippet text, and notes |
+| `q` | Case-insensitive search over user title, fetched title, snippet text, and notes |
 
-API item DTOs expose processing results already present in
-`metadata_snapshots`, including `archive_status`, `thumbnail_s3_key`, and
-payload-specific URL/text copy data, plus `watch_status` and `inbox_status`. `PATCH /items/{item_id}`
+API item DTOs expose the user-entered item `title` separately from the
+enrichment `fetched_title` stored in `metadata_snapshots`. They also include
+`archive_status`, `thumbnail_s3_key`, payload-specific URL/text copy data,
+`watch_status`, and `inbox_status`. `PATCH /items/{item_id}`
 accepts any non-empty subset of `watch_status`, `inbox_status`, `notes`, and
 `tags`. Missing fields preserve existing values, `tags: []` clears explicit
 item tags, and provided tags are trimmed and deduplicated by normalized name.
