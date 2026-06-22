@@ -186,7 +186,7 @@ describe("ItemDetail text snippets", () => {
     expect(container.querySelector(".markdown-snippet strong")?.textContent).toBe(
       "first copied line"
     );
-    expect(container.querySelector('textarea[name="notes"]')?.getAttribute("rows")).toBe("2");
+    expect(container.querySelector(".notes-editor")?.getAttribute("rows")).toBe("3");
     root.unmount();
     container.remove();
   });

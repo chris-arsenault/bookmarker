@@ -1,24 +1,23 @@
-import { useState, type FormEvent } from "react";
-import { selectedTagsFromForm, TagEditor } from "./TagEditor";
+import { useState, type KeyboardEvent } from "react";
+import { ItemStatusControls } from "./ItemStatusControls";
+import { SaveErrorModal } from "./SaveErrorModal";
+import { TagEditor } from "./TagEditor";
+import { itemFetchedTitle, itemSubtitle, itemTitle } from "./itemDisplay";
 import type {
-  InboxStatus,
   LibraryItemDetail,
+  LibraryItemSummary,
   TagCorpusEntry,
   UpdateItemRequest,
-  WatchStatus,
 } from "./types";
 
 type OrganizerDensity = "default" | "compact";
+type SavingField = "title" | "notes" | "tags" | "watch" | "inbox" | null;
 
-const watchOptions: { label: string; value: WatchStatus }[] = [
-  { label: "Unwatched", value: "unwatched" },
-  { label: "Watched", value: "watched" },
-];
-
-const inboxOptions: { label: string; value: InboxStatus }[] = [
-  { label: "Unsorted", value: "unsorted" },
-  { label: "Organized", value: "organized" },
-];
+type OrganizerDraft = {
+  title: string;
+  notes: string;
+  tags: string[];
+};
 
 export function ItemOrganizer({
   detail,
@@ -31,147 +30,209 @@ export function ItemOrganizer({
   density: OrganizerDensity;
   onUpdateItem: (itemId: string, request: UpdateItemRequest) => Promise<LibraryItemDetail>;
 }) {
-  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState(() => draftFromDetail(detail));
+  const [savingField, setSavingField] = useState<SavingField>(null);
   const [error, setError] = useState("");
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSaving(true);
+
+  const savePatch = async (request: UpdateItemRequest, field: SavingField) => {
+    setSavingField(field);
     setError("");
     try {
-      const request = organizationRequest(new FormData(event.currentTarget));
       const updated = await onUpdateItem(detail.summary.id, request);
-      confirmReturnedTitle(updated, request.title ?? "");
+      confirmReturnedPatch(updated, request);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "organization update failed");
+      setError(err instanceof Error ? err.message : "Item update failed");
     } finally {
-      setSaving(false);
+      setSavingField(null);
     }
   };
+
   return (
-    <form
-      className={density === "compact" ? "item-organizer compact" : "item-organizer"}
-      onSubmit={submit}
-    >
-      <h3>Edit item</h3>
-      <TitleField disabled={saving} title={detail.summary.title} />
-      <NotesField density={density} disabled={saving} notes={detail.notes} />
+    <section className={density === "compact" ? "item-organizer compact" : "item-organizer"}>
+      <div className="item-organizer-topline">
+        <TitleEditor
+          displayTitle={itemTitle(detail.summary)}
+          disabled={savingField !== null}
+          savedTitle={detail.summary.title}
+          value={draft.title}
+          onChange={(title) => setDraft({ ...draft, title })}
+          onCommit={(title) => commitTitle(title, detail.summary.title, savePatch)}
+        />
+        <ItemStatusControls
+          disabled={savingField !== null}
+          summary={detail.summary}
+          onInboxStatus={(inbox_status) => {
+            void savePatch({ inbox_status }, "inbox");
+          }}
+          onWatchStatus={(watch_status) => {
+            void savePatch({ watch_status }, "watch");
+          }}
+        />
+      </div>
+      <TitleMetadata summary={detail.summary} />
       <TagEditor
         availableTags={availableTags}
-        disabled={saving}
-        selectedTags={detail.summary.tags}
+        disabled={savingField !== null}
+        selectedTags={draft.tags}
+        onChange={(tags) => {
+          setDraft({ ...draft, tags });
+          void savePatch({ tags }, "tags");
+        }}
       />
-      <StatusChoices
-        current={detail.summary.watch_status}
-        disabled={saving}
-        name="watch_status"
-        options={watchOptions}
-        title="Watch status"
+      <NotesEditor
+        disabled={savingField !== null}
+        savedNotes={detail.notes}
+        value={draft.notes}
+        onChange={(notes) => setDraft({ ...draft, notes })}
+        onCommit={(notes) => commitNotes(notes, detail.notes, savePatch)}
       />
-      <StatusChoices
-        current={detail.summary.inbox_status}
-        disabled={saving}
-        name="inbox_status"
-        options={inboxOptions}
-        title="Inbox status"
-      />
-      {error ? <p className="form-error">{error}</p> : null}
-      <button className="primary-action" disabled={saving} type="submit">
-        {saving ? "Saving" : "Save item"}
-      </button>
-    </form>
+      {error ? <SaveErrorModal message={error} onClose={() => setError("")} /> : null}
+    </section>
   );
 }
 
-function TitleField({ title, disabled }: { title: string | null; disabled: boolean }) {
-  return (
-    <label className="organizer-field">
-      Title
-      <input
-        defaultValue={title ?? ""}
-        disabled={disabled}
-        name="title"
-        placeholder="Untitled"
-        type="text"
-      />
-    </label>
-  );
-}
-
-function NotesField({
-  notes,
-  density,
+function TitleEditor({
+  value,
+  savedTitle,
+  displayTitle,
   disabled,
+  onChange,
+  onCommit,
 }: {
-  notes: string;
-  density: OrganizerDensity;
+  value: string;
+  savedTitle: string | null;
+  displayTitle: string;
   disabled: boolean;
+  onChange: (title: string) => void;
+  onCommit: (title: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const visibleTitle = cleanTitle(value) ?? displayTitle;
+  return (
+    <h2 className="editable-title" id="detail-title">
+      {editing ? (
+        <input
+          aria-label="Title"
+          disabled={disabled}
+          onBlur={() => {
+            setEditing(false);
+            onCommit(value);
+          }}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => handleTitleKeyDown(event, savedTitle, onChange, setEditing)}
+          placeholder={displayTitle}
+          ref={(input) => {
+            if (editing) {
+              input?.focus();
+            }
+          }}
+          type="text"
+          value={value}
+        />
+      ) : (
+        <button disabled={disabled} onClick={() => setEditing(true)} type="button">
+          {visibleTitle}
+        </button>
+      )}
+    </h2>
+  );
+}
+
+function TitleMetadata({ summary }: { summary: LibraryItemSummary }) {
+  const fetchedTitle = itemFetchedTitle(summary);
+  return (
+    <div className="item-title-metadata">
+      <span>{itemSubtitle(summary)}</span>
+      {fetchedTitle ? <span>Fetched: {fetchedTitle}</span> : null}
+    </div>
+  );
+}
+
+function NotesEditor({
+  value,
+  savedNotes,
+  disabled,
+  onChange,
+  onCommit,
+}: {
+  value: string;
+  savedNotes: string;
+  disabled: boolean;
+  onChange: (notes: string) => void;
+  onCommit: (notes: string) => void;
 }) {
   return (
-    <label className="organizer-field">
-      Notes
-      <textarea defaultValue={notes} disabled={disabled} name="notes" rows={notesRows(density)} />
-    </label>
+    <textarea
+      aria-label="Notes"
+      className="notes-editor"
+      disabled={disabled}
+      onBlur={() => onCommit(value)}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder="Notes"
+      rows={notesRows(value, savedNotes)}
+      value={value}
+    />
   );
 }
 
-function notesRows(density: OrganizerDensity) {
-  return density === "compact" ? 2 : 4;
+function handleTitleKeyDown(
+  event: KeyboardEvent<HTMLInputElement>,
+  savedTitle: string | null,
+  onChange: (title: string) => void,
+  setEditing: (editing: boolean) => void
+) {
+  if (event.key === "Enter") {
+    event.currentTarget.blur();
+  }
+  if (event.key === "Escape") {
+    onChange(savedTitle ?? "");
+    setEditing(false);
+  }
 }
 
-function StatusChoices<T extends string>({
-  title,
-  name,
-  options,
-  current,
-  disabled,
-}: {
-  title: string;
-  name: string;
-  options: { label: string; value: T }[];
-  current: T;
-  disabled: boolean;
-}) {
-  return (
-    <fieldset className="status-options">
-      <legend>{title}</legend>
-      {options.map((option) => (
-        <label key={option.value}>
-          <input
-            defaultChecked={option.value === current}
-            disabled={disabled}
-            name={name}
-            type="radio"
-            value={option.value}
-          />
-          <span>{option.label}</span>
-        </label>
-      ))}
-    </fieldset>
-  );
+function commitTitle(
+  title: string,
+  savedTitle: string | null,
+  savePatch: (request: UpdateItemRequest, field: SavingField) => Promise<void>
+) {
+  if (cleanTitle(title) !== savedTitle) {
+    void savePatch({ title }, "title");
+  }
 }
 
-function organizationRequest(formData: FormData): UpdateItemRequest {
+function commitNotes(
+  notes: string,
+  savedNotes: string,
+  savePatch: (request: UpdateItemRequest, field: SavingField) => Promise<void>
+) {
+  if (notes !== savedNotes) {
+    void savePatch({ notes }, "notes");
+  }
+}
+
+function confirmReturnedPatch(detail: LibraryItemDetail, request: UpdateItemRequest) {
+  if ("title" in request && detail.summary.title !== cleanTitle(request.title ?? "")) {
+    throw new Error("Title save did not persist. The API may need to be deployed.");
+  }
+  if ("notes" in request && detail.notes !== (request.notes ?? "")) {
+    throw new Error("Notes save did not persist. The API may need to be deployed.");
+  }
+}
+
+function draftFromDetail(detail: LibraryItemDetail): OrganizerDraft {
   return {
-    title: formValue(formData, "title"),
-    watch_status: formValue(formData, "watch_status") as WatchStatus,
-    inbox_status: formValue(formData, "inbox_status") as InboxStatus,
-    notes: formValue(formData, "notes"),
-    tags: selectedTagsFromForm(formData),
+    title: detail.summary.title ?? "",
+    notes: detail.notes,
+    tags: detail.summary.tags.map((tag) => tag.display_name),
   };
 }
 
-function confirmReturnedTitle(detail: LibraryItemDetail, title: string) {
-  if (detail.summary.title !== cleanTitle(title)) {
-    throw new Error("Title save did not persist. The API may need to be deployed.");
-  }
+function notesRows(value: string, savedNotes: string) {
+  const lineCount = Math.max(value.split("\n").length, savedNotes.split("\n").length);
+  return Math.min(Math.max(lineCount, 3), 6);
 }
 
 function cleanTitle(title: string) {
   const cleaned = title.trim();
   return cleaned ? cleaned : null;
-}
-
-function formValue(formData: FormData, name: string) {
-  const value = formData.get(name);
-  return typeof value === "string" ? value : "";
 }

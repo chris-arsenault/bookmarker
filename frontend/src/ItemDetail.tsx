@@ -2,19 +2,10 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
-import { formatDate } from "./dateDisplay";
 import { ImageItemDetail } from "./ImageDetail";
 import { ItemOrganizer } from "./ItemOrganizer";
-import { StatusBadge } from "./StatusBadge";
-import {
-  itemCopyLabel,
-  itemFetchedTitle,
-  itemSourceUrl,
-  itemSubtitle,
-  itemTitle,
-} from "./itemDisplay";
+import { itemCopyLabel, itemFetchedTitle, itemSourceUrl } from "./itemDisplay";
 import type {
-  ItemTag,
   LibraryItemDetail,
   LibraryItemSummary,
   TagCorpusEntry,
@@ -59,10 +50,6 @@ export function ItemDetail({
         <button aria-label="Close detail" className="modal-close" onClick={onClose} type="button">
           &times;
         </button>
-        <DetailPrimary detail={detail} onLoadImage={onLoadImage} sourceUrl={sourceUrl} />
-        {isTextSnippet ? null : <DetailMeta detail={detail} />}
-        <DetailTags tags={summary.tags} />
-        {!isTextSnippet && detail.notes ? <p className="notes">{detail.notes}</p> : null}
         <ItemOrganizer
           availableTags={availableTags}
           detail={detail}
@@ -70,6 +57,7 @@ export function ItemDetail({
           key={summary.id}
           onUpdateItem={onUpdateItem}
         />
+        <DetailPrimary detail={detail} onLoadImage={onLoadImage} sourceUrl={sourceUrl} />
         <DetailActions
           detail={detail}
           onClose={onClose}
@@ -109,11 +97,6 @@ function TextSnippetDetail({ detail }: { detail: LibraryItemDetail }) {
   }
   return (
     <section className="text-detail-summary" aria-label="Saved text">
-      <div className="text-detail-heading">
-        <p className="eyebrow">Text</p>
-        <h2 id="detail-title">{itemTitle(summary)}</h2>
-        <p>{textSnippetMeta(summary)}</p>
-      </div>
       <div className="snippet-body snippet-body-primary markdown-snippet">
         <ReactMarkdown remarkPlugins={markdownPlugins}>{summary.text.plain_text}</ReactMarkdown>
       </div>
@@ -130,56 +113,13 @@ function LinkDetailHeading({
 }) {
   const fetchedTitle = itemFetchedTitle(summary);
   return (
-    <div className="detail-heading">
-      <StatusBadge status={summary.archive_status} />
-      <h2 id="detail-title">{itemTitle(summary)}</h2>
+    <div className="link-detail-content">
       {fetchedTitle ? <p>Fetched title: {fetchedTitle}</p> : null}
-      <p>{itemSubtitle(summary)}</p>
       {sourceUrl ? (
         <a className="detail-source-url" href={sourceUrl} rel="noreferrer" target="_blank">
           {sourceUrl}
         </a>
       ) : null}
-    </div>
-  );
-}
-
-function textSnippetMeta(summary: LibraryItemSummary) {
-  const source = summary.text?.source_app ?? summary.text?.source_device ?? "Manual capture";
-  return `${source} · ${formatDate(summary.created_at)}`;
-}
-
-function DetailMeta({ detail }: { detail: LibraryItemDetail }) {
-  const { summary } = detail;
-  return (
-    <dl className="detail-list">
-      <div>
-        <dt>Added</dt>
-        <dd>{formatDate(summary.created_at)}</dd>
-      </div>
-      <div>
-        <dt>Watch status</dt>
-        <dd>{summary.watch_status}</dd>
-      </div>
-      <div>
-        <dt>Inbox status</dt>
-        <dd>{summary.inbox_status}</dd>
-      </div>
-    </dl>
-  );
-}
-
-function DetailTags({ tags }: { tags: ItemTag[] }) {
-  if (tags.length === 0) {
-    return null;
-  }
-  return (
-    <div className="tag-row">
-      {tags.map((tag) => (
-        <span className="tag-chip" key={tag.id}>
-          {tag.display_name}
-        </span>
-      ))}
     </div>
   );
 }

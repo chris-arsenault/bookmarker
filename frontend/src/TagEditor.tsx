@@ -1,59 +1,223 @@
-import type { ItemTag, TagCorpusEntry } from "./types";
+import { useId, useState, type FocusEvent, type KeyboardEvent } from "react";
+import type { TagCorpusEntry } from "./types";
 
-type TagChoice = {
-  display_name: string;
-  normalized_name: string;
+type TagOption = {
+  displayName: string;
+  normalizedName: string;
+  usageCount: number;
 };
 
 export function TagEditor({
   availableTags,
   selectedTags,
   disabled,
+  onChange,
 }: {
   availableTags: TagCorpusEntry[];
-  selectedTags: ItemTag[];
+  selectedTags: string[];
   disabled: boolean;
+  onChange: (tags: string[]) => void;
 }) {
-  const selectedNames = new Set(selectedTags.map((tag) => tag.normalized_name));
-  const choices = tagChoices(availableTags, selectedTags);
+  const listId = useId();
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const options = tagOptions(availableTags, selectedTags, query);
+  const createTag = creatableTag(query, availableTags, selectedTags);
+
+  const select = (tag: string) => {
+    onChange(dedupeTags([...selectedTags, tag]));
+    setQuery("");
+    setOpen(true);
+  };
+
   return (
-    <fieldset className="tag-editor">
-      <legend>Tags</legend>
-      <div className="tag-options">
-        {choices.map((tag) => (
-          <label className="tag-toggle" key={tag.normalized_name}>
-            <input
-              defaultChecked={selectedNames.has(tag.normalized_name)}
-              disabled={disabled}
-              name="tag"
-              type="checkbox"
-              value={tag.display_name}
-            />
-            <span>{tag.display_name}</span>
-          </label>
+    <div className="tag-selector" onBlur={(event) => closeOnBlur(event, setOpen)}>
+      <div className={open ? "tag-selector-input open" : "tag-selector-input"}>
+        {selectedTags.map((tag) => (
+          <SelectedTagChip
+            disabled={disabled}
+            key={normalizeTag(tag)}
+            tag={tag}
+            onRemove={() => onChange(removeTag(selectedTags, tag))}
+          />
         ))}
+        <input
+          aria-label="Tags"
+          disabled={disabled}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onClick={() => setOpen(true)}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(event) =>
+            handleTagKeyDown(event, query, selectedTags, select, onChange, setOpen)
+          }
+          placeholder={selectedTags.length === 0 ? "Tags" : ""}
+          type="text"
+          value={query}
+        />
       </div>
-      <label className="new-tag-field">
-        New tag
-        <input disabled={disabled} name="new_tag" type="text" />
-      </label>
-    </fieldset>
+      {open ? (
+        <TagDropdown
+          createTag={createTag}
+          disabled={disabled}
+          id={listId}
+          options={options}
+          onSelect={select}
+        />
+      ) : null}
+    </div>
   );
 }
 
-export function selectedTagsFromForm(formData: FormData) {
-  const checkedTags = formData.getAll("tag").map(formValue);
-  const newTags = formValue(formData.get("new_tag")).split(",");
-  return dedupeTags([...checkedTags, ...newTags]);
+function SelectedTagChip({
+  tag,
+  disabled,
+  onRemove,
+}: {
+  tag: string;
+  disabled: boolean;
+  onRemove: () => void;
+}) {
+  return (
+    <span className="tag-selector-chip">
+      {tag}
+      <button aria-label={`Remove ${tag}`} disabled={disabled} onClick={onRemove} type="button">
+        &times;
+      </button>
+    </span>
+  );
 }
 
-function tagChoices(availableTags: TagCorpusEntry[], selectedTags: ItemTag[]) {
-  const choices = new Map<string, TagChoice>();
-  selectedTags.forEach((tag) => choices.set(tag.normalized_name, tag));
-  availableTags.forEach((tag) => choices.set(tag.normalized_name, tag));
-  return [...choices.values()].sort((left, right) =>
-    left.normalized_name.localeCompare(right.normalized_name)
+function TagDropdown({
+  id,
+  options,
+  createTag,
+  disabled,
+  onSelect,
+}: {
+  id: string;
+  options: TagOption[];
+  createTag: string | null;
+  disabled: boolean;
+  onSelect: (tag: string) => void;
+}) {
+  if (options.length === 0 && !createTag) {
+    return (
+      <div className="tag-selector-dropdown" id={id}>
+        <p>No tags available</p>
+      </div>
+    );
+  }
+  return (
+    <div className="tag-selector-dropdown" id={id}>
+      {createTag ? (
+        <TagOptionButton
+          disabled={disabled}
+          label={`Create ${createTag}`}
+          onSelect={() => onSelect(createTag)}
+        />
+      ) : null}
+      {options.map((option) => (
+        <TagOptionButton
+          disabled={disabled}
+          key={option.normalizedName}
+          label={option.displayName}
+          onSelect={() => onSelect(option.displayName)}
+          usageCount={option.usageCount}
+        />
+      ))}
+    </div>
   );
+}
+
+function TagOptionButton({
+  label,
+  usageCount,
+  disabled,
+  onSelect,
+}: {
+  label: string;
+  usageCount?: number;
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button disabled={disabled} onClick={onSelect} type="button">
+      <span>{label}</span>
+      {usageCount ? <small>{usageCount}</small> : null}
+    </button>
+  );
+}
+
+function handleTagKeyDown(
+  event: KeyboardEvent<HTMLInputElement>,
+  query: string,
+  selectedTags: string[],
+  select: (tag: string) => void,
+  onChange: (tags: string[]) => void,
+  setOpen: (open: boolean) => void
+) {
+  if (event.key === "Enter" && query.trim()) {
+    event.preventDefault();
+    select(query);
+  }
+  if (event.key === "Backspace" && !query && selectedTags.length > 0) {
+    event.preventDefault();
+    onChange(selectedTags.slice(0, -1));
+  }
+  if (event.key === "Escape") {
+    setOpen(false);
+  }
+}
+
+function tagOptions(
+  availableTags: TagCorpusEntry[],
+  selectedTags: string[],
+  query: string
+): TagOption[] {
+  const selected = new Set(selectedTags.map(normalizeTag));
+  const search = query.trim().toLowerCase();
+  return availableTags
+    .filter((tag) => !selected.has(tag.normalized_name))
+    .filter((tag) => tag.display_name.toLowerCase().includes(search))
+    .sort(sortTagsByUsage)
+    .map((tag) => ({
+      displayName: tag.display_name,
+      normalizedName: tag.normalized_name,
+      usageCount: tag.usage_count,
+    }));
+}
+
+function creatableTag(
+  query: string,
+  availableTags: TagCorpusEntry[],
+  selectedTags: string[]
+): string | null {
+  const value = query.trim();
+  const normalized = normalizeTag(value);
+  const known = availableTags.some((tag) => tag.normalized_name === normalized);
+  const selected = selectedTags.some((tag) => normalizeTag(tag) === normalized);
+  return value && !known && !selected ? value : null;
+}
+
+function sortTagsByUsage(left: TagCorpusEntry, right: TagCorpusEntry) {
+  return (
+    right.usage_count - left.usage_count || left.display_name.localeCompare(right.display_name)
+  );
+}
+
+function closeOnBlur(event: FocusEvent<HTMLDivElement>, setOpen: (open: boolean) => void) {
+  const nextTarget = event.relatedTarget;
+  if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+    setOpen(false);
+  }
+}
+
+function removeTag(tags: string[], tag: string) {
+  const normalized = normalizeTag(tag);
+  return tags.filter((item) => normalizeTag(item) !== normalized);
 }
 
 function dedupeTags(values: string[]) {
@@ -64,10 +228,10 @@ function dedupeTags(values: string[]) {
 
 function addTagValue(selected: Map<string, string>, value: string) {
   if (value.length > 0) {
-    selected.set(value.toLowerCase(), value);
+    selected.set(normalizeTag(value), value);
   }
 }
 
-function formValue(value: FormDataEntryValue | null) {
-  return typeof value === "string" ? value : "";
+function normalizeTag(value: string) {
+  return value.trim().toLowerCase();
 }

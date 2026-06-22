@@ -75,7 +75,7 @@ describe("LibraryView browsing", () => {
 });
 
 describe("LibraryView organizer", () => {
-  it("renders_item_organizer_for_notes_tags_watch_and_inbox", async () => {
+  it("renders_compact_item_controls_for_notes_tags_watch_and_inbox", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -99,16 +99,17 @@ describe("LibraryView organizer", () => {
 
     await openFirstItem(container);
 
-    expect(container.textContent).toContain("Save item");
-    expect(container.textContent).toContain("Notes");
-    expect(container.textContent).toContain("Unwatched");
-    expect(container.textContent).toContain("Organized");
-    expect(container.textContent).toContain("New tag");
+    expect(container.querySelector(".editable-title")).not.toBeNull();
+    expect(container.querySelector(".notes-editor")).not.toBeNull();
+    expect(container.querySelector(".tag-selector")).not.toBeNull();
+    expect(findButtonByLabel(container, "Watch status: Unwatched")).not.toBeNull();
+    expect(findButtonByLabel(container, "Inbox status: Unsorted")).not.toBeNull();
+    expect(container.textContent).not.toContain("Save item");
     root.unmount();
     container.remove();
   });
 
-  it("submits_item_organization_update", async () => {
+  it("saves_item_organization_from_inline_controls", async () => {
     const updates: UpdateItemRequest[] = [];
     const container = document.createElement("div");
     document.body.append(container);
@@ -126,7 +127,7 @@ describe("LibraryView organizer", () => {
           onOpenSource={() => undefined}
           onUpdateItem={async (_itemId, request) => {
             updates.push(request);
-            return libraryState.selectedDetail as LibraryItemDetail;
+            return updatedFixtureDetail(request);
           }}
           onRenameTag={renameTagNoop}
           onMergeTags={mergeTagsNoop}
@@ -135,17 +136,17 @@ describe("LibraryView organizer", () => {
     });
 
     await openFirstItem(container);
-    const form = container.querySelector("form.item-organizer") as HTMLFormElement;
-    setFieldValue(form, "notes", "Filed after watching");
-    setFieldValue(form, "new_tag", "Videos");
-    checkRadio(container, "watch_status", "watched");
-    checkRadio(container, "inbox_status", "organized");
+    await changeAndBlur(container.querySelector(".notes-editor"), "Filed after watching");
+    await choosePopoverOption(container, "Watch status: Unwatched", "Watched");
+    await choosePopoverOption(container, "Inbox status: Unsorted", "Organized");
+    await selectTag(container, "Lerning");
 
-    await act(async () => {
-      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    });
-
-    expect(updates).toEqual([expectedOrganizationUpdate()]);
+    expect(updates).toEqual([
+      { notes: "Filed after watching" },
+      { watch_status: "watched" },
+      { inbox_status: "organized" },
+      { tags: ["Learning", "Lerning"] },
+    ]);
     root.unmount();
     container.remove();
   });
@@ -215,24 +216,9 @@ describe("LibraryView tag management", () => {
   });
 });
 
-function expectedOrganizationUpdate(): UpdateItemRequest {
-  return {
-    title: "Saved video",
-    watch_status: "watched",
-    inbox_status: "organized",
-    notes: "Filed after watching",
-    tags: ["Learning", "Videos"],
-  };
-}
-
 function setFieldValue(form: HTMLFormElement, name: string, value: string) {
   const field = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement;
   field.value = value;
-}
-
-function checkRadio(container: HTMLElement, name: string, value: string) {
-  const field = container.querySelector(`input[name="${name}"][value="${value}"]`);
-  (field as HTMLInputElement).checked = true;
 }
 
 async function openFirstItem(container: HTMLElement) {
@@ -240,6 +226,87 @@ async function openFirstItem(container: HTMLElement) {
   await act(async () => {
     row.click();
   });
+}
+
+async function changeAndBlur(field: Element | null, value: string) {
+  await act(async () => {
+    const input = field as HTMLInputElement | HTMLTextAreaElement;
+    setNativeValue(input, value);
+    input.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    await Promise.resolve();
+  });
+}
+
+async function choosePopoverOption(container: HTMLElement, triggerLabel: string, option: string) {
+  await act(async () => {
+    findButtonByLabel(container, triggerLabel).click();
+    await Promise.resolve();
+  });
+  await act(async () => {
+    findButton(container, option).click();
+    await Promise.resolve();
+  });
+}
+
+async function selectTag(container: HTMLElement, tag: string) {
+  await act(async () => {
+    container.querySelector<HTMLInputElement>('input[aria-label="Tags"]')?.click();
+    await Promise.resolve();
+  });
+  await act(async () => {
+    findButton(container, tag).click();
+    await Promise.resolve();
+  });
+}
+
+function setNativeValue(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const prototype =
+    input instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(prototype, "value")?.set?.call(input, value);
+}
+
+function updatedFixtureDetail(request: UpdateItemRequest): LibraryItemDetail {
+  const detail = libraryState.selectedDetail as LibraryItemDetail;
+  return {
+    ...detail,
+    notes: request.notes ?? detail.notes,
+    summary: {
+      ...detail.summary,
+      watch_status: request.watch_status ?? detail.summary.watch_status,
+      inbox_status: request.inbox_status ?? detail.summary.inbox_status,
+      tags: request.tags ? request.tags.map(fixtureTag) : detail.summary.tags,
+    },
+  };
+}
+
+function fixtureTag(tag: string) {
+  return {
+    id: tag.toLowerCase(),
+    display_name: tag,
+    normalized_name: tag.toLowerCase(),
+  };
+}
+
+function findButton(container: HTMLElement, label: string) {
+  const button = [...container.querySelectorAll("button")].find(
+    (item) => item.textContent?.includes(label) ?? false
+  );
+  if (!button) {
+    throw new Error(`Missing button: ${label}`);
+  }
+  return button;
+}
+
+function findButtonByLabel(container: HTMLElement, label: string) {
+  const button = container.querySelector(`button[aria-label="${label}"]`);
+  if (!button) {
+    throw new Error(`Missing button: ${label}`);
+  }
+  return button as HTMLButtonElement;
 }
 
 function submitRename(container: HTMLElement, tagId: string, value: string) {
