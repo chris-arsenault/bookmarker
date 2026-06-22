@@ -27,6 +27,10 @@ pub const LINKDROP_ITEM_TITLES_MIGRATION: &str =
     include_str!("../../../db/migrations/006_item_titles.sql");
 pub const LINKDROP_ITEM_TITLES_ROLLBACK: &str =
     include_str!("../../../db/migrations/rollback/006_item_titles.sql");
+pub const LINKDROP_IMAGE_ITEMS_MIGRATION: &str =
+    include_str!("../../../db/migrations/007_image_items.sql");
+pub const LINKDROP_IMAGE_ITEMS_ROLLBACK: &str =
+    include_str!("../../../db/migrations/rollback/007_image_items.sql");
 
 pub type DbPool = sqlx::PgPool;
 
@@ -73,6 +77,7 @@ pub(crate) mod tests {
     use super::database_url;
     use super::{
         LINKDROP_CAPTURE_IDEMPOTENCY_MIGRATION, LINKDROP_CAPTURE_IDEMPOTENCY_ROLLBACK,
+        LINKDROP_IMAGE_ITEMS_MIGRATION, LINKDROP_IMAGE_ITEMS_ROLLBACK,
         LINKDROP_INBOX_STATUS_MIGRATION, LINKDROP_INBOX_STATUS_ROLLBACK,
         LINKDROP_ITEM_DELETIONS_MIGRATION, LINKDROP_ITEM_DELETIONS_ROLLBACK,
         LINKDROP_ITEM_TITLES_MIGRATION, LINKDROP_ITEM_TITLES_ROLLBACK, LINKDROP_MODEL_MIGRATION,
@@ -113,6 +118,8 @@ pub(crate) mod tests {
         assert!(LINKDROP_ITEM_DELETIONS_ROLLBACK.contains("DROP TABLE IF EXISTS item_deletions"));
         assert!(LINKDROP_ITEM_TITLES_MIGRATION.contains("ADD COLUMN title"));
         assert!(LINKDROP_ITEM_TITLES_ROLLBACK.contains("DROP COLUMN IF EXISTS title"));
+        assert!(LINKDROP_IMAGE_ITEMS_MIGRATION.contains("CREATE TABLE item_images"));
+        assert!(LINKDROP_IMAGE_ITEMS_ROLLBACK.contains("DROP TABLE IF EXISTS item_images"));
     }
 
     #[test]

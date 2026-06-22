@@ -1,9 +1,10 @@
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::domain::{ArchiveStatus, InboxStatus, ItemKind, WatchStatus};
+use crate::domain::{ArchiveStatus, ImageUploadStatus, InboxStatus, ItemKind, WatchStatus};
 use crate::library::{
-    ItemTag, ItemTextSummary, ItemUrlSummary, LibraryItemDetail, LibraryItemSummary, TagCorpusEntry,
+    ItemImageSummary, ItemTag, ItemTextSummary, ItemUrlSummary, LibraryItemDetail,
+    LibraryItemSummary, TagCorpusEntry,
 };
 
 #[derive(sqlx::FromRow)]
@@ -15,9 +16,17 @@ pub(crate) struct ItemRow {
     pub(crate) plain_text: Option<String>,
     pub(crate) html_content: Option<String>,
     pub(crate) content_hash: Option<String>,
-    pub(crate) source_app: Option<String>,
-    pub(crate) source_device: Option<String>,
-    pub(crate) capture_method: Option<String>,
+    pub(crate) text_source_app: Option<String>,
+    pub(crate) text_source_device: Option<String>,
+    pub(crate) text_capture_method: Option<String>,
+    pub(crate) image_s3_key: Option<String>,
+    pub(crate) image_content_type: Option<String>,
+    pub(crate) image_original_filename: Option<String>,
+    pub(crate) image_byte_size: Option<i64>,
+    pub(crate) image_upload_status: Option<String>,
+    pub(crate) image_source_app: Option<String>,
+    pub(crate) image_source_device: Option<String>,
+    pub(crate) image_capture_method: Option<String>,
     pub(crate) title: Option<String>,
     pub(crate) fetched_title: Option<String>,
     pub(crate) thumbnail_s3_key: Option<String>,
@@ -41,6 +50,7 @@ impl ItemRow {
         inbox_status: InboxStatus,
     ) -> LibraryItemDetail {
         let item_kind = ItemKind::try_from(self.item_kind.as_str()).unwrap_or(ItemKind::Url);
+        let image = image_summary(&self);
         let url = self
             .original_url
             .map(|original_url| ItemUrlSummary::new(original_url, self.canonical_url));
@@ -52,9 +62,9 @@ impl ItemRow {
                     plain_text,
                     self.html_content,
                     hash,
-                    self.source_app,
-                    self.source_device,
-                    self.capture_method
+                    self.text_source_app,
+                    self.text_source_device,
+                    self.text_capture_method
                         .unwrap_or_else(|| "desktop_clipboard".to_string()),
                 )
             });
@@ -64,6 +74,7 @@ impl ItemRow {
                 item_kind,
                 url,
                 text,
+                image,
                 title: self.title,
                 fetched_title: self.fetched_title,
                 thumbnail_s3_key: self.thumbnail_s3_key,
@@ -79,6 +90,30 @@ impl ItemRow {
             notes: self.notes,
         }
     }
+}
+
+fn image_summary(row: &ItemRow) -> Option<ItemImageSummary> {
+    let s3_key = row.image_s3_key.clone()?;
+    let content_type = row.image_content_type.clone()?;
+    Some(ItemImageSummary {
+        s3_key,
+        content_type,
+        original_filename: row.image_original_filename.clone(),
+        byte_size: row.image_byte_size,
+        upload_status: upload_status(row.image_upload_status.as_deref()),
+        source_app: row.image_source_app.clone(),
+        source_device: row.image_source_device.clone(),
+        capture_method: row
+            .image_capture_method
+            .clone()
+            .unwrap_or_else(|| "android_share".to_string()),
+    })
+}
+
+fn upload_status(value: Option<&str>) -> ImageUploadStatus {
+    value
+        .and_then(|value| ImageUploadStatus::try_from(value).ok())
+        .unwrap_or(ImageUploadStatus::Pending)
 }
 
 #[derive(sqlx::FromRow)]

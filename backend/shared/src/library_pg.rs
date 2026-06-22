@@ -23,6 +23,8 @@ mod library_pg_capture_insert;
 mod library_pg_delete;
 #[path = "library_pg_filters.rs"]
 mod library_pg_filters;
+#[path = "library_pg_image.rs"]
+mod library_pg_image;
 #[path = "library_pg_rows.rs"]
 mod library_pg_rows;
 #[path = "library_pg_sql.rs"]
@@ -100,6 +102,22 @@ impl LibraryService for PgLibraryService {
         request: crate::library::CaptureTextRequest,
     ) -> AppResult<CaptureItemOutcome> {
         library_pg_capture::capture_text(self, user, request).await
+    }
+
+    async fn capture_image_upload(
+        &self,
+        user: &UserContext,
+        request: crate::library::CaptureImageUploadRequest,
+    ) -> AppResult<CaptureItemOutcome> {
+        library_pg_image::capture_image_upload(self, user, request).await
+    }
+
+    async fn complete_image_upload(
+        &self,
+        user: &UserContext,
+        item_id: Uuid,
+    ) -> AppResult<LibraryItemDetail> {
+        library_pg_image::complete_image_upload(self, user, item_id).await
     }
 
     async fn list_items(
@@ -216,12 +234,16 @@ impl LibraryService for PgLibraryService {
             .as_ref()
             .map(|tags| validate_tags(tags))
             .transpose()?;
+        let title_was_provided = request.title.is_some();
+        let title = clean_optional(request.title.clone());
         let mut transaction = self.db.begin().await.map_err(database_error)?;
         let result = sqlx::query(UPDATE_ITEM_ORGANIZATION)
             .bind(item_id)
             .bind(user_id)
             .bind(request.watch_status.map(WatchStatus::as_str))
             .bind(request.inbox_status.map(InboxStatus::as_str))
+            .bind(title_was_provided)
+            .bind(title.as_deref())
             .execute(&mut *transaction)
             .await
             .map_err(database_error)?;
@@ -363,6 +385,12 @@ fn canonical_conflict_without_row() -> AppError {
 
 fn not_found(item_id: Uuid) -> AppError {
     AppError::NotFound(format!("item {item_id}"))
+}
+
+fn clean_optional(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 #[cfg(test)]

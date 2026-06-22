@@ -4,7 +4,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::auth::UserContext;
-use crate::domain::{ArchiveStatus, InboxStatus, ItemKind, WatchStatus};
+use crate::domain::{ArchiveStatus, ImageUploadStatus, InboxStatus, ItemKind, WatchStatus};
 use crate::error::{AppError, AppResult};
 
 #[path = "library_in_memory.rs"]
@@ -31,6 +31,26 @@ pub trait LibraryService: Send + Sync {
     ) -> AppResult<CaptureItemOutcome> {
         Err(AppError::Internal(
             "text capture is not implemented".to_string(),
+        ))
+    }
+
+    async fn capture_image_upload(
+        &self,
+        _user: &UserContext,
+        _request: CaptureImageUploadRequest,
+    ) -> AppResult<CaptureItemOutcome> {
+        Err(AppError::Internal(
+            "image capture is not implemented".to_string(),
+        ))
+    }
+
+    async fn complete_image_upload(
+        &self,
+        _user: &UserContext,
+        _item_id: Uuid,
+    ) -> AppResult<LibraryItemDetail> {
+        Err(AppError::Internal(
+            "image upload completion is not implemented".to_string(),
         ))
     }
 
@@ -111,6 +131,21 @@ pub struct CaptureTextRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CaptureImageUploadRequest {
+    pub content_type: String,
+    #[serde(default)]
+    pub title: Option<String>,
+    pub original_filename: Option<String>,
+    pub byte_size: Option<i64>,
+    pub source_app: Option<String>,
+    pub source_device: Option<String>,
+    pub capture_method: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    pub client_capture_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaptureItemOutcome {
     pub item: LibraryItemDetail,
     pub created: bool,
@@ -149,6 +184,7 @@ pub struct LibraryItemSummary {
     pub item_kind: ItemKind,
     pub url: Option<ItemUrlSummary>,
     pub text: Option<ItemTextSummary>,
+    pub image: Option<ItemImageSummary>,
     pub title: Option<String>,
     pub fetched_title: Option<String>,
     pub thumbnail_s3_key: Option<String>,
@@ -190,6 +226,18 @@ pub struct ItemTextSummary {
     pub preview: String,
     pub content_hash: String,
     pub html: Option<String>,
+    pub source_app: Option<String>,
+    pub source_device: Option<String>,
+    pub capture_method: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ItemImageSummary {
+    pub s3_key: String,
+    pub content_type: String,
+    pub original_filename: Option<String>,
+    pub byte_size: Option<i64>,
+    pub upload_status: ImageUploadStatus,
     pub source_app: Option<String>,
     pub source_device: Option<String>,
     pub capture_method: String,
@@ -254,6 +302,7 @@ pub struct TagCorpusEntry {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UpdateItemRequest {
+    pub title: Option<String>,
     pub watch_status: Option<WatchStatus>,
     pub inbox_status: Option<InboxStatus>,
     pub notes: Option<String>,

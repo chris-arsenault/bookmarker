@@ -2,7 +2,9 @@ package io.ahara.linkdrop.share
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -11,6 +13,7 @@ import android.widget.Toast
 import io.ahara.linkdrop.MainActivity
 import io.ahara.linkdrop.R
 import io.ahara.linkdrop.api.AuthRequiredException
+import io.ahara.linkdrop.api.CaptureImageUploadAttempt
 import io.ahara.linkdrop.api.CaptureAttempt
 import io.ahara.linkdrop.api.CaptureTextAttempt
 import io.ahara.linkdrop.api.LinkdropApiClient
@@ -19,16 +22,16 @@ import java.util.UUID
 
 class ShareActivity : Activity() {
     private lateinit var apiClient: LinkdropApiClient
-    private lateinit var sharedCapture: SharedCapture
-    private lateinit var clientCaptureId: String
+    private lateinit var sharedCaptures: List<SharedCapture>
+    private lateinit var clientCaptureIds: List<String>
     private lateinit var tagState: ShareTagState
     private lateinit var tagChipRow: TagChipRow
     private lateinit var freeTextInput: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val parsedCapture = ShareIntentParser.parse(intent)
-        if (parsedCapture == null) {
+        val parsedCaptures = ShareIntentParser.parse(intent)
+        if (parsedCaptures.isEmpty()) {
             Toast.makeText(this, R.string.share_missing_payload, Toast.LENGTH_SHORT).show()
             finish()
             return
@@ -36,9 +39,9 @@ class ShareActivity : Activity() {
 
         apiClient = LinkdropApiClient(CognitoAuthClient(this))
         tagState = ShareTagState()
-        sharedCapture = parsedCapture
-        clientCaptureId = UUID.randomUUID().toString()
-        setContentView(contentView(parsedCapture.preview))
+        sharedCaptures = parsedCaptures
+        clientCaptureIds = parsedCaptures.map { UUID.randomUUID().toString() }
+        setContentView(contentView(sharePreview(parsedCaptures)))
     }
 
     private fun contentView(sharedUrl: String): LinearLayout {
@@ -93,7 +96,13 @@ class ShareActivity : Activity() {
     }
 
     private fun saveCapture(tags: List<String>) {
-        when (val capture = sharedCapture) {
+        sharedCaptures.forEachIndexed { index, capture ->
+            saveOneCapture(capture, clientCaptureIds[index], tags)
+        }
+    }
+
+    private fun saveOneCapture(capture: SharedCapture, clientCaptureId: String, tags: List<String>) {
+        when (capture) {
             is SharedCapture.Url -> apiClient.capture(
                 CaptureAttempt(
                     url = capture.url,
@@ -109,7 +118,30 @@ class ShareActivity : Activity() {
                     clientCaptureId = clientCaptureId,
                 ),
             )
+            is SharedCapture.Image -> saveImageCapture(capture, clientCaptureId, tags)
         }
+    }
+
+    private fun saveImageCapture(
+        capture: SharedCapture.Image,
+        clientCaptureId: String,
+        tags: List<String>,
+    ) {
+        val metadata = imageMetadata(capture)
+        val upload = apiClient.createImageUpload(
+            CaptureImageUploadAttempt(
+                contentType = metadata.contentType,
+                title = capture.title ?: metadata.displayName,
+                originalFilename = metadata.displayName,
+                byteSize = metadata.byteSize,
+                tags = tags,
+                clientCaptureId = clientCaptureId,
+            ),
+        )
+        val input = contentResolver.openInputStream(capture.uri)
+            ?: throw IllegalStateException("image stream unavailable")
+        apiClient.uploadImage(upload.upload, input, metadata.byteSize)
+        apiClient.completeImageUpload(upload.itemId)
     }
 
     private fun loadTagCorpus() {
@@ -140,4 +172,49 @@ class ShareActivity : Activity() {
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
     }
+
+    private fun imageMetadata(capture: SharedCapture.Image): ImageMetadata {
+        val query = contentResolver.query(capture.uri, null, null, null, null)
+        query.use { cursor ->
+            val displayName = cursor?.value(OpenableColumns.DISPLAY_NAME)
+            val byteSize = cursor?.longValue(OpenableColumns.SIZE)?.takeIf { it > 0 }
+            return ImageMetadata(
+                contentType = resolvedImageContentType(capture.uri, capture.contentType),
+                displayName = displayName,
+                byteSize = byteSize,
+            )
+        }
+    }
+
+    private fun resolvedImageContentType(uri: Uri, fallback: String): String {
+        val resolved = contentResolver.getType(uri)
+            ?.takeIf { it.startsWith("image/") && it != "image/*" }
+        val provided = fallback.takeIf { it.startsWith("image/") && it != "image/*" }
+        return resolved ?: provided ?: "image/jpeg"
+    }
+}
+
+private data class ImageMetadata(
+    val contentType: String,
+    val displayName: String?,
+    val byteSize: Long?,
+)
+
+private fun sharePreview(captures: List<SharedCapture>): String =
+    captures.joinToString(separator = "\n\n") { capture -> capture.preview }
+
+private fun android.database.Cursor.value(columnName: String): String? {
+    if (!moveToFirst()) {
+        return null
+    }
+    val index = getColumnIndex(columnName)
+    return index.takeIf { it >= 0 }?.let(::getString)?.takeIf(String::isNotBlank)
+}
+
+private fun android.database.Cursor.longValue(columnName: String): Long? {
+    if (!moveToFirst()) {
+        return null
+    }
+    val index = getColumnIndex(columnName)
+    return index.takeIf { it >= 0 }?.let(::getLong)
 }

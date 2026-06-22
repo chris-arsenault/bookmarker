@@ -99,6 +99,7 @@ async fn in_memory_update_item_edits_tags_notes_watch_and_inbox() {
             &user(),
             item_id,
             UpdateItemRequest {
+                title: None,
                 watch_status: Some(WatchStatus::Watched),
                 inbox_status: Some(InboxStatus::Organized),
                 notes: Some("Filed for the API design pass".to_string()),

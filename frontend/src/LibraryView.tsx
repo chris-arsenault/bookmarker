@@ -28,6 +28,7 @@ type LibraryViewProps = {
   onFiltersChange: (filters: LibraryFilters) => void;
   onCopyLink: (item: LibraryItemSummary) => void;
   onOpenSource: (url: string) => void;
+  onLoadImage?: (itemId: string) => Promise<Blob>;
   onUpdateItem: (itemId: string, request: UpdateItemRequest) => Promise<LibraryItemDetail>;
   onCreateText?: (request: CaptureTextRequest) => Promise<CaptureItemOutcome>;
   onCreateLink?: (request: CaptureLinkRequest) => Promise<CaptureItemOutcome>;
@@ -56,6 +57,7 @@ function ReadyLibraryView({
   onFiltersChange,
   onCopyLink,
   onOpenSource,
+  onLoadImage,
   onUpdateItem,
   onCreateText,
   onCreateLink,
@@ -114,6 +116,7 @@ function ReadyLibraryView({
             onClose={detailModal.close}
             onCopyLink={onCopyLink}
             onDeleteItem={onDeleteItem}
+            onLoadImage={onLoadImage}
             onOpenSource={onOpenSource}
             onUpdateItem={onUpdateItem}
           />

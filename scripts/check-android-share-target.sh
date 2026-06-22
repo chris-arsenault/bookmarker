@@ -7,7 +7,9 @@ JAVA_DIR="${ANDROID_DIR}/java/io/ahara/linkdrop"
 MANIFEST="${ANDROID_DIR}/AndroidManifest.xml"
 
 rg 'android.intent.action.SEND' "${MANIFEST}" >/dev/null
+rg 'android.intent.action.SEND_MULTIPLE' "${MANIFEST}" >/dev/null
 rg 'android:mimeType="text/plain"' "${MANIFEST}" >/dev/null
+rg 'android:mimeType="image/\*"' "${MANIFEST}" >/dev/null
 rg 'android:name=".share.ShareActivity"' "${MANIFEST}" >/dev/null
 
 rg 'interface AuthRepository|class StoredTokenAuthRepository' "${JAVA_DIR}/auth" >/dev/null
@@ -18,9 +20,18 @@ rg 'Authorization", "Bearer' "${JAVA_DIR}/api/LinkdropApiClient.kt" >/dev/null
 
 rg 'class LinkdropApiClient' "${JAVA_DIR}/api" >/dev/null
 rg 'client_capture_id' "${JAVA_DIR}/api" >/dev/null
+rg 'CaptureImageUploadAttempt' "${JAVA_DIR}/api" >/dev/null
+rg 'ImageUploadTarget' "${JAVA_DIR}/api" >/dev/null
+rg 'createImageUpload' "${JAVA_DIR}/api" >/dev/null
+rg 'uploadImage' "${JAVA_DIR}/api" >/dev/null
+rg 'completeImageUpload' "${JAVA_DIR}/api" >/dev/null
 rg '"/items"|"/tags"' "${JAVA_DIR}/api" >/dev/null
 
 rg 'ShareIntentParser' "${JAVA_DIR}/share" >/dev/null
+rg 'ACTION_SEND_MULTIPLE' "${JAVA_DIR}/share" >/dev/null
+rg 'SharedCapture.Image' "${JAVA_DIR}/share" >/dev/null
+rg 'openInputStream' "${JAVA_DIR}/share" >/dev/null
+rg 'OpenableColumns' "${JAVA_DIR}/share" >/dev/null
 rg 'ShareTagState' "${JAVA_DIR}/share" >/dev/null
 rg 'TagChipRow' "${JAVA_DIR}/share" >/dev/null
 rg 'listTags' "${JAVA_DIR}/share" >/dev/null

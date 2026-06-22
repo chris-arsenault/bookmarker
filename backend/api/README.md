@@ -20,7 +20,7 @@ best-effort asynchronous enrichment after the item is saved.
 | `GET /items/{item_id}` | Bearer token | Saved item detail |
 | `GET /items/{item_id}/thumbnail` | Bearer token | Linkdrop-owned thumbnail snapshot bytes |
 | `GET /tags` | Bearer token | Explicit tag corpus entries |
-| `PATCH /items/{item_id}` | Bearer token | Updated item detail after organization changes |
+| `PATCH /items/{item_id}` | Bearer token | Updated item detail after item edits |
 | `PATCH /tags/{tag_id}` | Bearer token | Updated tag corpus after tag rename |
 | `POST /tags/{source_tag_id}/merge` | Bearer token | Updated tag corpus after merging one tag into another |
 
@@ -99,9 +99,10 @@ API item DTOs expose the user-entered item `title` separately from the
 enrichment `fetched_title` stored in `metadata_snapshots`. They also include
 `archive_status`, `thumbnail_s3_key`, payload-specific URL/text copy data,
 `watch_status`, and `inbox_status`. `PATCH /items/{item_id}`
-accepts any non-empty subset of `watch_status`, `inbox_status`, `notes`, and
-`tags`. Missing fields preserve existing values, `tags: []` clears explicit
-item tags, and provided tags are trimmed and deduplicated by normalized name.
+accepts any non-empty subset of `title`, `watch_status`, `inbox_status`,
+`notes`, and `tags`. Missing fields preserve existing values, a blank `title`
+clears the user-entered title, `tags: []` clears explicit item tags, and
+provided tags are trimmed and deduplicated by normalized name.
 
 `PATCH /tags/{tag_id}` accepts `{ "display_name": "..." }` and rejects
 normalized-name collisions. `POST /tags/{source_tag_id}/merge` accepts

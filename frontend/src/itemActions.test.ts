@@ -18,6 +18,14 @@ describe("item actions", () => {
 
     expect(writes).toEqual(["snippet body"]);
   });
+
+  it("copyCanonicalLink writes image filenames", async () => {
+    const writes: string[] = [];
+
+    await copyCanonicalLink(imageItem(), { writeText: async (value) => writes.push(value) });
+
+    expect(writes).toEqual(["phone.jpg"]);
+  });
 });
 
 function urlItem() {
@@ -30,6 +38,7 @@ function urlItem() {
       copy_url: "https://example.com/canonical",
     },
     text: null,
+    image: null,
   } satisfies LibraryItemSummary;
 }
 
@@ -38,6 +47,7 @@ function textItem() {
     ...baseItem(),
     item_kind: "text_snippet",
     url: null,
+    image: null,
     text: {
       plain_text: "snippet body",
       preview: "snippet body",
@@ -51,11 +61,32 @@ function textItem() {
   } satisfies LibraryItemSummary;
 }
 
+function imageItem() {
+  return {
+    ...baseItem(),
+    item_kind: "image",
+    url: null,
+    text: null,
+    image: {
+      s3_key: "images/item-1/original",
+      content_type: "image/jpeg",
+      original_filename: "phone.jpg",
+      byte_size: 2048,
+      upload_status: "uploaded",
+      source_app: "Android share",
+      source_device: "android",
+      capture_method: "android_share",
+    },
+    archive_status: "succeeded",
+  } satisfies LibraryItemSummary;
+}
+
 function baseItem() {
   return {
     id: "item-1",
     title: null,
     fetched_title: null,
+    image: null,
     thumbnail_s3_key: null,
     author: null,
     platform: null,

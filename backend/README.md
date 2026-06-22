@@ -31,7 +31,7 @@ processing Lambda.
 | `GET /items/{item_id}` | Yes | Current user's saved item detail |
 | `GET /items/{item_id}/thumbnail` | Yes | Current user's Linkdrop-owned snapshot thumbnail |
 | `GET /tags` | Yes | Current user's explicit tag corpus |
-| `PATCH /items/{item_id}` | Yes | Update notes, explicit tags, `watch_status`, and `inbox_status` |
+| `PATCH /items/{item_id}` | Yes | Update title, notes, explicit tags, `watch_status`, and `inbox_status` |
 | `PATCH /tags/{tag_id}` | Yes | Rename a tag when the normalized destination does not collide |
 | `POST /tags/{source_tag_id}/merge` | Yes | Merge a source tag into a different target tag |
 

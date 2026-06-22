@@ -3,11 +3,12 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use serde::Deserialize;
-use shared::domain::{ArchiveStatus, InboxStatus, WatchStatus};
+use serde::{Deserialize, Serialize};
+use shared::domain::{ArchiveStatus, ImageUploadStatus, InboxStatus, WatchStatus};
 use shared::library::{
-    CaptureItemOutcome, CaptureItemRequest, CaptureTextRequest, LibraryItemDetail,
-    LibraryItemSummary, LibraryUpdates, ListItemUpdatesQuery, ListItemsQuery, UpdateItemRequest,
+    CaptureImageUploadRequest, CaptureItemOutcome, CaptureItemRequest, CaptureTextRequest,
+    LibraryItemDetail, LibraryItemSummary, LibraryUpdates, ListItemUpdatesQuery, ListItemsQuery,
+    UpdateItemRequest,
 };
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
@@ -20,11 +21,67 @@ pub fn router() -> Router<ApiState> {
         .route("/items", get(list_items).post(capture_item))
         .route("/items/updates", get(list_item_updates))
         .route("/items/text", post(capture_text))
+        .route("/items/images/uploads", post(capture_image_upload))
+        .route("/items/{item_id}/image", get(get_item_image))
+        .route(
+            "/items/{item_id}/image-upload/complete",
+            post(complete_image_upload),
+        )
         .route("/items/{item_id}/thumbnail", get(get_item_thumbnail))
         .route(
             "/items/{item_id}",
             get(get_item).patch(update_item).delete(delete_item),
         )
+}
+
+#[derive(Debug, Serialize)]
+struct CaptureImageUploadOutcome {
+    item: LibraryItemDetail,
+    created: bool,
+    upload: crate::image_access::ImageUploadTarget,
+}
+
+async fn capture_image_upload(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Json(request): Json<CaptureImageUploadRequest>,
+) -> Result<(StatusCode, Json<CaptureImageUploadOutcome>), ApiError> {
+    let user = require_user(&state, &headers).await?;
+    let outcome = state.library.capture_image_upload(&user, request).await?;
+    let image = outcome
+        .item
+        .summary
+        .image
+        .as_ref()
+        .ok_or_else(|| validation_error("image upload did not create image metadata"))?;
+    let upload = state
+        .image_store
+        .upload_target(&image.s3_key, &image.content_type)
+        .await?;
+    let status = if outcome.created {
+        StatusCode::CREATED
+    } else {
+        StatusCode::OK
+    };
+    Ok((
+        status,
+        Json(CaptureImageUploadOutcome {
+            item: outcome.item,
+            created: outcome.created,
+            upload,
+        }),
+    ))
+}
+
+async fn complete_image_upload(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Path(item_id): Path<Uuid>,
+) -> Result<Json<LibraryItemDetail>, ApiError> {
+    let user = require_user(&state, &headers).await?;
+    Ok(Json(
+        state.library.complete_image_upload(&user, item_id).await?,
+    ))
 }
 
 async fn capture_text(
@@ -111,6 +168,24 @@ async fn get_item_thumbnail(
     Ok(([(header::CONTENT_TYPE, object.content_type)], object.bytes).into_response())
 }
 
+async fn get_item_image(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Path(item_id): Path<Uuid>,
+) -> Result<Response, ApiError> {
+    let user = require_user(&state, &headers).await?;
+    let item = state.library.get_item(&user, item_id).await?;
+    let image = item
+        .summary
+        .image
+        .ok_or_else(|| shared::error::AppError::NotFound(format!("image for item {item_id}")))?;
+    if image.upload_status != ImageUploadStatus::Uploaded {
+        return Err(shared::error::AppError::NotFound(format!("image for item {item_id}")).into());
+    }
+    let object = state.image_store.read_image(&image.s3_key).await?;
+    Ok(([(header::CONTENT_TYPE, object.content_type)], object.bytes).into_response())
+}
+
 async fn update_item(
     State(state): State<ApiState>,
     headers: HeaderMap,
@@ -118,7 +193,7 @@ async fn update_item(
     Json(request): Json<UpdateItemRequest>,
 ) -> Result<Json<LibraryItemDetail>, ApiError> {
     if empty_update_request(&request) {
-        return Err(validation_error("organization update must include at least one field").into());
+        return Err(validation_error("item update must include at least one field").into());
     }
     let user = require_user(&state, &headers).await?;
     Ok(Json(
@@ -241,7 +316,8 @@ fn parse_datetime_param(
 }
 
 fn empty_update_request(request: &UpdateItemRequest) -> bool {
-    request.watch_status.is_none()
+    request.title.is_none()
+        && request.watch_status.is_none()
         && request.inbox_status.is_none()
         && request.notes.is_none()
         && request.tags.is_none()

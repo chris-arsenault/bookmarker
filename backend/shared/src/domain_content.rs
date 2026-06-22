@@ -7,6 +7,7 @@ use super::{invalid_value, DomainError};
 pub enum ItemKind {
     Url,
     TextSnippet,
+    Image,
 }
 
 impl ItemKind {
@@ -14,6 +15,7 @@ impl ItemKind {
         match self {
             Self::Url => "url",
             Self::TextSnippet => "text_snippet",
+            Self::Image => "image",
         }
     }
 }
@@ -25,7 +27,39 @@ impl TryFrom<&str> for ItemKind {
         match value {
             "url" => Ok(Self::Url),
             "text_snippet" => Ok(Self::TextSnippet),
+            "image" => Ok(Self::Image),
             _ => Err(invalid_value("item_kind", value)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageUploadStatus {
+    Pending,
+    Uploaded,
+    Failed,
+}
+
+impl ImageUploadStatus {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Uploaded => "uploaded",
+            Self::Failed => "failed",
+        }
+    }
+}
+
+impl TryFrom<&str> for ImageUploadStatus {
+    type Error = DomainError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "pending" => Ok(Self::Pending),
+            "uploaded" => Ok(Self::Uploaded),
+            "failed" => Ok(Self::Failed),
+            _ => Err(invalid_value("image_upload_status", value)),
         }
     }
 }

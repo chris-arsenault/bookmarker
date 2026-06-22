@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { formatDate } from "./dateDisplay";
+import { ImageItemDetail } from "./ImageDetail";
 import { ItemOrganizer } from "./ItemOrganizer";
 import { StatusBadge } from "./StatusBadge";
 import {
@@ -28,6 +29,7 @@ export function ItemDetail({
   onClose,
   onCopyLink,
   onOpenSource,
+  onLoadImage,
   onUpdateItem,
   onDeleteItem,
 }: {
@@ -36,6 +38,7 @@ export function ItemDetail({
   onClose: () => void;
   onCopyLink: (item: LibraryItemDetail["summary"]) => void;
   onOpenSource: (url: string) => void;
+  onLoadImage?: (itemId: string) => Promise<Blob>;
   onUpdateItem: (itemId: string, request: UpdateItemRequest) => Promise<LibraryItemDetail>;
   onDeleteItem?: (itemId: string) => Promise<void>;
 }) {
@@ -56,11 +59,7 @@ export function ItemDetail({
         <button aria-label="Close detail" className="modal-close" onClick={onClose} type="button">
           &times;
         </button>
-        {isTextSnippet ? (
-          <TextSnippetDetail detail={detail} />
-        ) : (
-          <LinkDetailHeading sourceUrl={sourceUrl} summary={summary} />
-        )}
+        <DetailPrimary detail={detail} onLoadImage={onLoadImage} sourceUrl={sourceUrl} />
         {isTextSnippet ? null : <DetailMeta detail={detail} />}
         <DetailTags tags={summary.tags} />
         {!isTextSnippet && detail.notes ? <p className="notes">{detail.notes}</p> : null}
@@ -82,6 +81,25 @@ export function ItemDetail({
       </aside>
     </div>
   );
+}
+
+function DetailPrimary({
+  detail,
+  sourceUrl,
+  onLoadImage,
+}: {
+  detail: LibraryItemDetail;
+  sourceUrl: string | null;
+  onLoadImage?: (itemId: string) => Promise<Blob>;
+}) {
+  const { summary } = detail;
+  if (summary.text) {
+    return <TextSnippetDetail detail={detail} />;
+  }
+  if (summary.image) {
+    return <ImageItemDetail detail={detail} onLoadImage={onLoadImage} />;
+  }
+  return <LinkDetailHeading sourceUrl={sourceUrl} summary={summary} />;
 }
 
 function TextSnippetDetail({ detail }: { detail: LibraryItemDetail }) {

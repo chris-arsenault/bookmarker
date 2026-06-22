@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 mod cors;
+pub mod image_access;
 mod item_routes;
 pub mod processing_dispatch;
 mod tag_routes;
@@ -20,6 +21,7 @@ use shared::error::{AppError, AppResult};
 use shared::library::LibraryService;
 use shared::library_pg::PgLibraryService;
 
+use image_access::{ImageObjectStore, S3ImageObjectStore};
 use processing_dispatch::{LambdaProcessingDispatcher, ProcessingDispatcher};
 use thumbnail_access::{S3ThumbnailReader, ThumbnailReader};
 
@@ -31,6 +33,15 @@ pub struct ApiState {
     pub library: Arc<dyn LibraryService>,
     pub processing_dispatcher: Arc<dyn ProcessingDispatcher>,
     pub thumbnail_reader: Arc<dyn ThumbnailReader>,
+    pub image_store: Arc<dyn ImageObjectStore>,
+}
+
+pub struct ApiStateServices {
+    pub auth: Arc<dyn AuthVerifier>,
+    pub library: Arc<dyn LibraryService>,
+    pub processing_dispatcher: Arc<dyn ProcessingDispatcher>,
+    pub thumbnail_reader: Arc<dyn ThumbnailReader>,
+    pub image_store: Arc<dyn ImageObjectStore>,
 }
 
 impl ApiState {
@@ -40,28 +51,27 @@ impl ApiState {
         Ok(Self::new(
             config.clone(),
             db.clone(),
-            Arc::new(CognitoJwtVerifier::from_config(&config.cognito)),
-            Arc::new(PgLibraryService::new(db.clone())),
-            Arc::new(LambdaProcessingDispatcher::from_env(db.clone()).await),
-            Arc::new(S3ThumbnailReader::from_env().await?),
+            ApiStateServices {
+                auth: Arc::new(CognitoJwtVerifier::from_config(&config.cognito)),
+                library: Arc::new(PgLibraryService::new(db.clone())),
+                processing_dispatcher: Arc::new(
+                    LambdaProcessingDispatcher::from_env(db.clone()).await,
+                ),
+                thumbnail_reader: Arc::new(S3ThumbnailReader::from_env().await?),
+                image_store: Arc::new(S3ImageObjectStore::from_env().await?),
+            },
         ))
     }
 
-    pub fn new(
-        config: AppConfig,
-        db: DbPool,
-        auth: Arc<dyn AuthVerifier>,
-        library: Arc<dyn LibraryService>,
-        processing_dispatcher: Arc<dyn ProcessingDispatcher>,
-        thumbnail_reader: Arc<dyn ThumbnailReader>,
-    ) -> Self {
+    pub fn new(config: AppConfig, db: DbPool, services: ApiStateServices) -> Self {
         Self {
             config,
             db,
-            auth,
-            library,
-            processing_dispatcher,
-            thumbnail_reader,
+            auth: services.auth,
+            library: services.library,
+            processing_dispatcher: services.processing_dispatcher,
+            thumbnail_reader: services.thumbnail_reader,
+            image_store: services.image_store,
         }
     }
 }

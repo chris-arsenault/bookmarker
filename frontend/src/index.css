@@ -491,6 +491,7 @@ h1 {
 .filter-bar select,
 .tag-action-form input,
 .tag-action-form select,
+.organizer-field input,
 .organizer-field textarea,
 .new-tag-field input,
 .signin-panel input {
@@ -987,6 +988,37 @@ button:disabled {
 
 .markdown-snippet > *:last-child {
   margin-bottom: 0;
+}
+
+.image-detail-summary {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.image-detail-preview,
+.image-detail-placeholder {
+  width: 100%;
+  max-height: min(32rem, 58vh);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-inset);
+}
+
+.image-detail-preview {
+  object-fit: contain;
+}
+
+.image-detail-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 14rem;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.image-download {
+  width: fit-content;
 }
 
 .markdown-snippet h1,

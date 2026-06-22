@@ -4,7 +4,7 @@ use crate::auth::UserContext;
 use crate::error::AppResult;
 use crate::library::{LibraryItemDetail, LibraryItemSummary, UpdateItemRequest};
 
-use super::{not_found, tag_ops, InMemoryLibraryService};
+use super::{clean_optional, not_found, tag_ops, InMemoryLibraryService};
 
 pub(super) fn update_item(
     service: &InMemoryLibraryService,
@@ -18,6 +18,9 @@ pub(super) fn update_item(
         .iter_mut()
         .find(|item| item.summary.id == item_id)
         .ok_or_else(|| not_found(item_id))?;
+    if let Some(title) = request.title {
+        item.summary.title = clean_optional(Some(title));
+    }
     if let Some(watch_status) = request.watch_status {
         item.summary.watch_status = watch_status;
     }

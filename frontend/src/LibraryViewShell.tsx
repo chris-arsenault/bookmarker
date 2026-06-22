@@ -76,6 +76,7 @@ export function LibraryViewShell({
         selectItem(apiClient, itemId, setLibraryState).catch(() => {});
       }}
       onCopyLink={copyLink}
+      onLoadImage={(itemId) => apiClient.fetchImage(itemId)}
       onOpenSource={openSource}
       onUpdateItem={(itemId, request) =>
         updateItemOrganization(apiClient, itemId, request, setLibraryState)

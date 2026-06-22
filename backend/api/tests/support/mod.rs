@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+use api::image_access::{ImageObjectStore, InMemoryImageObjectStore};
 use api::thumbnail_access::InMemoryThumbnailReader;
-use api::{router, ApiState};
+use api::{router, ApiState, ApiStateServices};
 use async_trait::async_trait;
 use axum::body::{to_bytes, Body};
 use axum::http::{Method, Request, Response};
@@ -32,9 +33,29 @@ pub fn test_app(library: Arc<dyn LibraryService>) -> Router {
     test_app_with_processing_dispatcher(library, Arc::new(NoopProcessingDispatcher))
 }
 
+#[allow(dead_code)]
+pub fn test_app_with_image_store(
+    library: Arc<dyn LibraryService>,
+    image_store: Arc<dyn ImageObjectStore>,
+) -> Router {
+    test_app_with_state_parts(library, Arc::new(NoopProcessingDispatcher), image_store)
+}
+
 pub fn test_app_with_processing_dispatcher(
     library: Arc<dyn LibraryService>,
     processing_dispatcher: Arc<dyn api::processing_dispatch::ProcessingDispatcher>,
+) -> Router {
+    test_app_with_state_parts(
+        library,
+        processing_dispatcher,
+        Arc::new(InMemoryImageObjectStore::default()),
+    )
+}
+
+fn test_app_with_state_parts(
+    library: Arc<dyn LibraryService>,
+    processing_dispatcher: Arc<dyn api::processing_dispatch::ProcessingDispatcher>,
+    image_store: Arc<dyn ImageObjectStore>,
 ) -> Router {
     let config = test_config();
     let db = sqlx::postgres::PgPoolOptions::new()
@@ -43,10 +64,13 @@ pub fn test_app_with_processing_dispatcher(
     router(ApiState::new(
         config,
         db,
-        Arc::new(TestAuthVerifier),
-        library,
-        processing_dispatcher,
-        Arc::new(InMemoryThumbnailReader::default()),
+        ApiStateServices {
+            auth: Arc::new(TestAuthVerifier),
+            library,
+            processing_dispatcher,
+            thumbnail_reader: Arc::new(InMemoryThumbnailReader::default()),
+            image_store,
+        },
     ))
 }
 
@@ -85,6 +109,7 @@ pub async fn response_json(response: Response<Body>) -> Value {
     serde_json::from_slice(&body).unwrap()
 }
 
+#[allow(dead_code)]
 pub fn assert_token_decodes(auth: &str, sub: &str) {
     let token = auth.strip_prefix("Bearer ").unwrap();
     let context = decode_unverified_claims(token).unwrap();

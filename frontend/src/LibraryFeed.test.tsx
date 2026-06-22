@@ -103,6 +103,7 @@ const textItem: LibraryItemSummary = {
   id: "item-1",
   item_kind: "text_snippet",
   url: null,
+  image: null,
   text: {
     plain_text: "copy this terminal output",
     preview: "copy this terminal output",

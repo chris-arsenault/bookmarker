@@ -3,6 +3,8 @@ package io.ahara.linkdrop.api
 import io.ahara.linkdrop.auth.AuthRepository
 import io.ahara.linkdrop.config.LinkdropConfig
 import org.json.JSONArray
+import org.json.JSONObject
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -39,6 +41,41 @@ class LinkdropApiClient(
         )
     }
 
+    fun createImageUpload(attempt: CaptureImageUploadAttempt): ImageUploadResult {
+        val response = request("POST", "/items/images/uploads", attempt.toJson())
+        val payload = JSONObject(response.body)
+        return ImageUploadResult(
+            itemId = payload.getJSONObject("item").getJSONObject("summary").getString("id"),
+            upload = uploadTarget(payload.getJSONObject("upload")),
+            created = response.statusCode == HttpURLConnection.HTTP_CREATED,
+        )
+    }
+
+    fun uploadImage(
+        target: ImageUploadTarget,
+        input: InputStream,
+        byteSize: Long?,
+    ) {
+        val connection = (URL(target.url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "PUT"
+            doOutput = true
+            target.headers.forEach { (name, value) -> setRequestProperty(name, value) }
+            byteSize?.takeIf { it > 0 }?.let { size -> setFixedLengthStreamingMode(size) }
+        }
+        input.use { source ->
+            connection.outputStream.use { output -> source.copyTo(output) }
+        }
+        val status = connection.responseCode
+        if (status !in 200..299) {
+            throw LinkdropApiException(status, connection.errorStreamText())
+        }
+    }
+
+    fun completeImageUpload(itemId: String): CaptureResult {
+        val response = request("POST", "/items/$itemId/image-upload/complete")
+        return CaptureResult(rawJson = response.body, created = false)
+    }
+
     private fun request(
         method: String,
         path: String,
@@ -67,6 +104,17 @@ class LinkdropApiClient(
         return ApiResponse(statusCode = status, body = responseBody)
     }
 }
+
+private fun uploadTarget(payload: JSONObject): ImageUploadTarget {
+    val headersPayload = payload.getJSONObject("headers")
+    val headers = headersPayload.keys().asSequence().associateWith { key ->
+        headersPayload.getString(key)
+    }
+    return ImageUploadTarget(url = payload.getString("url"), headers = headers)
+}
+
+private fun HttpURLConnection.errorStreamText(): String =
+    errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
 
 data class LinkdropApiException(
     val statusCode: Int,

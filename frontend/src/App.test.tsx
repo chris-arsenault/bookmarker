@@ -145,14 +145,7 @@ describe("LibraryView organizer", () => {
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
 
-    expect(updates).toEqual([
-      {
-        watch_status: "watched",
-        inbox_status: "organized",
-        notes: "Filed after watching",
-        tags: ["Learning", "Videos"],
-      },
-    ]);
+    expect(updates).toEqual([expectedOrganizationUpdate()]);
     root.unmount();
     container.remove();
   });
@@ -221,6 +214,16 @@ describe("LibraryView tag management", () => {
     expect(html).not.toContain("Starter");
   });
 });
+
+function expectedOrganizationUpdate(): UpdateItemRequest {
+  return {
+    title: "Saved video",
+    watch_status: "watched",
+    inbox_status: "organized",
+    notes: "Filed after watching",
+    tags: ["Learning", "Videos"],
+  };
+}
 
 function setFieldValue(form: HTMLFormElement, name: string, value: string) {
   const field = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement;

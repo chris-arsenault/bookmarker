@@ -1,7 +1,7 @@
 RUST_CLIPPY_FLAGS := -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines
 RUST_MAX_FILE_LINES := 400
-BACKEND_API_TESTS := api_capture api_foundation api_item_mutations api_items api_tags api_thumbnails
-BACKEND_DB_SHARED_TESTS := library_pg_capture library_pg_items library_pg_link_title library_pg_tags library_pg_updates linkdrop_capture_idempotency linkdrop_constraints linkdrop_inbox_status linkdrop_migration linkdrop_processing linkdrop_tags
+BACKEND_API_TESTS := api_capture api_foundation api_images api_item_mutations api_items api_tags api_thumbnails
+BACKEND_DB_SHARED_TESTS := library_pg_capture library_pg_images library_pg_items library_pg_link_title library_pg_tags library_pg_updates linkdrop_capture_idempotency linkdrop_constraints linkdrop_inbox_status linkdrop_migration linkdrop_processing linkdrop_tags
 BACKEND_DB_PROCESSING_TESTS := processing_pipeline
 
 .PHONY: ci lint rust-lines-check fmt typecheck desktop-typecheck desktop-package test backend-fast-test frontend-test db-test android-structure-check android-build-check android-release-build android-assemble android-create-release-keystore android-sign-release android-install-debug android-install-release docs-check terraform-fmt-check build deploy

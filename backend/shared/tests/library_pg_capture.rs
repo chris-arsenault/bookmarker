@@ -6,8 +6,9 @@ mod sqlx_support;
 use async_trait::async_trait;
 use shared::auth::UserContext;
 use shared::db::{
-    LINKDROP_CAPTURE_IDEMPOTENCY_MIGRATION, LINKDROP_INBOX_STATUS_MIGRATION,
-    LINKDROP_ITEM_TITLES_MIGRATION, LINKDROP_MODEL_MIGRATION, LINKDROP_TEXT_SNIPPET_MIGRATION,
+    LINKDROP_CAPTURE_IDEMPOTENCY_MIGRATION, LINKDROP_IMAGE_ITEMS_MIGRATION,
+    LINKDROP_INBOX_STATUS_MIGRATION, LINKDROP_ITEM_TITLES_MIGRATION, LINKDROP_MODEL_MIGRATION,
+    LINKDROP_TEXT_SNIPPET_MIGRATION,
 };
 use shared::domain::ArchiveStatus;
 use shared::library::{CaptureItemOutcome, CaptureItemRequest, LibraryService, ListItemsQuery};
@@ -359,6 +360,7 @@ fn apply_migrations(container_name: &str) {
     run_psql(container_name, LINKDROP_INBOX_STATUS_MIGRATION);
     run_psql(container_name, LINKDROP_TEXT_SNIPPET_MIGRATION);
     run_psql(container_name, LINKDROP_ITEM_TITLES_MIGRATION);
+    run_psql(container_name, LINKDROP_IMAGE_ITEMS_MIGRATION);
 }
 
 fn run_psql(container_name: &str, sql: &str) {

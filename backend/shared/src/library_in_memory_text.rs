@@ -90,6 +90,7 @@ fn new_text_item(
                 clean_optional(request.source_device.clone()),
                 capture_method(request.capture_method.clone()),
             )),
+            image: None,
             title: clean_optional(request.title.clone()),
             fetched_title: None,
             thumbnail_s3_key: None,

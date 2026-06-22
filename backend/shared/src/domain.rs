@@ -7,7 +7,7 @@ use uuid::Uuid;
 #[path = "domain_content.rs"]
 mod domain_content;
 
-pub use domain_content::{ItemKind, TextSnippetBody};
+pub use domain_content::{ImageUploadStatus, ItemKind, TextSnippetBody};
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum DomainError {

@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+use api::image_access::InMemoryImageObjectStore;
 use api::thumbnail_access::{InMemoryThumbnailReader, ThumbnailObject, ThumbnailReader};
-use api::{router, ApiState};
+use api::{router, ApiState, ApiStateServices};
 use async_trait::async_trait;
 use axum::body::{to_bytes, Body};
 use axum::http::{Method, Request, Response, StatusCode};
@@ -62,6 +63,7 @@ fn seeded_library(item_id: Uuid) -> Arc<InMemoryLibraryService> {
                     None,
                 )),
                 text: None,
+                image: None,
                 title: Some("Saved video".to_string()),
                 fetched_title: None,
                 thumbnail_s3_key: Some("snapshots/item/thumbnail.jpg".to_string()),
@@ -108,10 +110,13 @@ fn test_app_with_thumbnail_reader(
     router(ApiState::new(
         config,
         db,
-        Arc::new(TestAuthVerifier),
-        library,
-        Arc::new(NoopProcessingDispatcher),
-        thumbnail_reader,
+        ApiStateServices {
+            auth: Arc::new(TestAuthVerifier),
+            library,
+            processing_dispatcher: Arc::new(NoopProcessingDispatcher),
+            thumbnail_reader,
+            image_store: Arc::new(InMemoryImageObjectStore::default()),
+        },
     ))
 }
 

@@ -80,6 +80,13 @@ fn matches_text(item: &LibraryItemDetail, query: Option<&str>) -> bool {
                 .map(|text| text.plain_text.as_str()),
             &query,
         )
+        || contains_text(
+            item.summary
+                .image
+                .as_ref()
+                .and_then(|image| image.original_filename.as_deref()),
+            &query,
+        )
         || contains_text(Some(&item.notes), &query)
 }
 

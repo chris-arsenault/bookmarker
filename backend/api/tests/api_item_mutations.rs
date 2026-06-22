@@ -98,6 +98,24 @@ async fn patch_item_route_edits_tags_notes_watch_and_inbox() {
 }
 
 #[tokio::test]
+async fn patch_item_route_edits_item_title() {
+    let item_id = item_id();
+    let auth = bearer_token("user-sub");
+    let response = request(
+        test_app(seeded_library(item_id)),
+        Method::PATCH,
+        &format!("/items/{item_id}"),
+        Some(&auth),
+        Body::from(r#"{"title":"Renamed saved item"}"#),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let payload = response_json(response).await;
+    assert_eq!(payload["summary"]["title"], "Renamed saved item");
+}
+
+#[tokio::test]
 async fn patch_item_route_rejects_empty_organization_update() {
     let item_id = item_id();
     let auth = bearer_token("user-sub");
@@ -156,6 +174,7 @@ fn seeded_library(item_id: Uuid) -> Arc<InMemoryLibraryService> {
                     None,
                 )),
                 text: None,
+                image: None,
                 title: Some("Saved video".to_string()),
                 fetched_title: None,
                 thumbnail_s3_key: None,

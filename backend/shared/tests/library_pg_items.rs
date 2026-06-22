@@ -3,8 +3,8 @@ mod sqlx_support;
 
 use shared::auth::UserContext;
 use shared::db::{
-    LINKDROP_INBOX_STATUS_MIGRATION, LINKDROP_ITEM_TITLES_MIGRATION, LINKDROP_MODEL_MIGRATION,
-    LINKDROP_TEXT_SNIPPET_MIGRATION,
+    LINKDROP_IMAGE_ITEMS_MIGRATION, LINKDROP_INBOX_STATUS_MIGRATION,
+    LINKDROP_ITEM_TITLES_MIGRATION, LINKDROP_MODEL_MIGRATION, LINKDROP_TEXT_SNIPPET_MIGRATION,
 };
 use shared::domain::{ArchiveStatus, InboxStatus, WatchStatus};
 use shared::library::{LibraryService, ListItemsQuery, UpdateItemRequest};
@@ -131,6 +131,7 @@ async fn pg_update_item_replaces_tags_notes_watch_and_inbox() {
             &user(),
             item_id,
             UpdateItemRequest {
+                title: None,
                 watch_status: Some(WatchStatus::Watched),
                 inbox_status: Some(InboxStatus::Organized),
                 notes: Some("Filed after watching".to_string()),
@@ -161,6 +162,59 @@ async fn pg_update_item_replaces_tags_notes_watch_and_inbox() {
             .map(|tag| tag.normalized_name.as_str())
             .collect::<Vec<_>>(),
         vec!["later", "videos"]
+    );
+}
+
+#[tokio::test]
+async fn pg_update_item_edits_and_clears_item_title() {
+    let container = setup_sqlx_postgres();
+    apply_migrations(&container.name);
+    let pool = sqlx::PgPool::connect(&database_url(&container))
+        .await
+        .unwrap();
+    let user_id = seed_user(&pool, "filter-user").await;
+    let item_id = seed_item(
+        &pool,
+        user_id,
+        SeedItem::matching("https://example.com/title-edit"),
+    )
+    .await;
+    let service = PgLibraryService::new(pool);
+
+    let renamed = service
+        .update_item(
+            &user(),
+            item_id,
+            UpdateItemRequest {
+                title: Some(" Renamed item ".to_string()),
+                ..UpdateItemRequest::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(renamed.summary.title.as_deref(), Some("Renamed item"));
+    assert_eq!(
+        renamed.summary.fetched_title.as_deref(),
+        Some("Rust async talk")
+    );
+
+    let cleared = service
+        .update_item(
+            &user(),
+            item_id,
+            UpdateItemRequest {
+                title: Some("   ".to_string()),
+                ..UpdateItemRequest::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(cleared.summary.title, None);
+    assert_eq!(
+        cleared.summary.fetched_title.as_deref(),
+        Some("Rust async talk")
     );
 }
 
@@ -306,4 +360,5 @@ fn apply_migrations(container_name: &str) {
     run_psql(container_name, LINKDROP_INBOX_STATUS_MIGRATION);
     run_psql(container_name, LINKDROP_TEXT_SNIPPET_MIGRATION);
     run_psql(container_name, LINKDROP_ITEM_TITLES_MIGRATION);
+    run_psql(container_name, LINKDROP_IMAGE_ITEMS_MIGRATION);
 }

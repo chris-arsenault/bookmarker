@@ -9,6 +9,8 @@ import {
 import type {
   LibraryItemDetail,
   LibraryItemSummary,
+  CaptureImageUploadOutcome,
+  CaptureImageUploadRequest,
   CaptureLinkRequest,
   CaptureTextRequest,
   CaptureItemOutcome,
@@ -56,6 +58,20 @@ export class ApiClient {
     });
   }
 
+  createImageUpload(request: CaptureImageUploadRequest) {
+    return this.request<CaptureImageUploadOutcome>("/items/images/uploads", {
+      method: "POST",
+      body: request,
+    });
+  }
+
+  completeImageUpload(itemId: string) {
+    return this.request<LibraryItemDetail>(
+      `/items/${encodeURIComponent(itemId)}/image-upload/complete`,
+      { method: "POST" }
+    );
+  }
+
   getItem(itemId: string) {
     return this.request<LibraryItemDetail>(`/items/${encodeURIComponent(itemId)}`);
   }
@@ -100,6 +116,14 @@ export class ApiClient {
       baseUrl: this.baseUrl,
       clientOptions: this.options,
       path: `/items/${encodeURIComponent(itemId)}/thumbnail`,
+    });
+  }
+
+  fetchImage(itemId: string) {
+    return authenticatedBlobRequest({
+      baseUrl: this.baseUrl,
+      clientOptions: this.options,
+      path: `/items/${encodeURIComponent(itemId)}/image`,
     });
   }
 

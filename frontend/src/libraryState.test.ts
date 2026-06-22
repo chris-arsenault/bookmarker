@@ -70,6 +70,7 @@ function item(id: string, archiveStatus: LibraryItemSummary["archive_status"]) {
       copy_url: `https://example.com/${id}`,
     },
     text: null,
+    image: null,
     title: id,
     fetched_title: null,
     thumbnail_s3_key: null,

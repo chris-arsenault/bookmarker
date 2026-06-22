@@ -38,6 +38,42 @@ data class CaptureTextAttempt(
             .toString()
 }
 
+data class CaptureImageUploadAttempt(
+    val contentType: String,
+    val title: String? = null,
+    val originalFilename: String? = null,
+    val byteSize: Long? = null,
+    val sourceApp: String? = "Android share",
+    val sourceDevice: String? = "android",
+    val captureMethod: String? = "android_share",
+    val tags: List<String> = emptyList(),
+    val clientCaptureId: String = UUID.randomUUID().toString(),
+) {
+    fun toJson(): String =
+        JSONObject()
+            .put("content_type", contentType)
+            .put("title", title ?: JSONObject.NULL)
+            .put("original_filename", originalFilename ?: JSONObject.NULL)
+            .put("byte_size", byteSize ?: JSONObject.NULL)
+            .put("source_app", sourceApp ?: JSONObject.NULL)
+            .put("source_device", sourceDevice ?: JSONObject.NULL)
+            .put("capture_method", captureMethod ?: JSONObject.NULL)
+            .put("tags", JSONArray(tags))
+            .put("client_capture_id", clientCaptureId)
+            .toString()
+}
+
+data class ImageUploadResult(
+    val itemId: String,
+    val upload: ImageUploadTarget,
+    val created: Boolean,
+)
+
+data class ImageUploadTarget(
+    val url: String,
+    val headers: Map<String, String>,
+)
+
 data class CaptureResult(
     val rawJson: String,
     val created: Boolean,

@@ -257,6 +257,7 @@ function textItemDetail(request: CaptureTextRequest) {
       id: "item-1",
       item_kind: "text_snippet" as const,
       url: null,
+      image: null,
       text: {
         plain_text: request.plain_text,
         preview: request.plain_text,
@@ -293,6 +294,7 @@ function linkItemDetail(request: CaptureLinkRequest) {
         copy_url: request.url,
       },
       text: null,
+      image: null,
       title: request.title,
       fetched_title: null,
       thumbnail_s3_key: null,

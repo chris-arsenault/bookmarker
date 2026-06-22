@@ -195,6 +195,7 @@ function itemDetail(id: string): LibraryItemDetail {
       id,
       item_kind: "text_snippet",
       url: null,
+      image: null,
       text: {
         plain_text: id,
         preview: id,

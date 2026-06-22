@@ -1,7 +1,8 @@
 export type ArchiveStatus = "pending" | "succeeded" | "failed" | "not_applicable";
 export type WatchStatus = "unwatched" | "watched";
 export type InboxStatus = "unsorted" | "organized";
-export type ItemKind = "url" | "text_snippet";
+export type ItemKind = "url" | "text_snippet" | "image";
+export type ImageUploadStatus = "pending" | "uploaded" | "failed";
 
 export type ApiDateTime =
   | string
@@ -32,6 +33,7 @@ export type LibraryItemSummary = {
   item_kind: ItemKind;
   url: ItemUrlSummary | null;
   text: ItemTextSummary | null;
+  image: ItemImageSummary | null;
   title: string | null;
   fetched_title: string | null;
   thumbnail_s3_key: string | null;
@@ -56,6 +58,17 @@ export type ItemTextSummary = {
   preview: string;
   content_hash: string;
   html: string | null;
+  source_app: string | null;
+  source_device: string | null;
+  capture_method: string;
+};
+
+export type ItemImageSummary = {
+  s3_key: string;
+  content_type: string;
+  original_filename: string | null;
+  byte_size: number | null;
+  upload_status: ImageUploadStatus;
   source_app: string | null;
   source_device: string | null;
   capture_method: string;
@@ -96,6 +109,7 @@ export type ListItemUpdatesRequest = ListItemsFilters &
   }>;
 
 export type UpdateItemRequest = Partial<{
+  title: string;
   watch_status: WatchStatus;
   inbox_status: InboxStatus;
   notes: string;
@@ -118,6 +132,29 @@ export type CaptureLinkRequest = {
   title: string | null;
   tags: string[];
   client_capture_id: string | null;
+};
+
+export type CaptureImageUploadRequest = {
+  content_type: string;
+  title: string | null;
+  original_filename: string | null;
+  byte_size: number | null;
+  source_app: string | null;
+  source_device: string | null;
+  capture_method: string | null;
+  tags: string[];
+  client_capture_id: string | null;
+};
+
+export type ImageUploadTarget = {
+  url: string;
+  headers: Record<string, string>;
+};
+
+export type CaptureImageUploadOutcome = {
+  item: LibraryItemDetail;
+  created: boolean;
+  upload: ImageUploadTarget;
 };
 
 export type RenameTagRequest = {

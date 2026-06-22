@@ -2,10 +2,13 @@
 
 Native Android client for Bookmarker quick-drop capture.
 
-The app registers an `ACTION_SEND` text/plain share target. Shared text is
-parsed for the first HTTP(S) URL; if no URL is present, non-empty shared text is
-captured as a text snippet. The user can drop either payload immediately with no
-required fields. The share screen loads the authenticated `GET /tags` corpus
+The app registers `ACTION_SEND` targets for `text/plain` and `image/*`, plus
+`ACTION_SEND_MULTIPLE` for shared image batches. Shared text is parsed for the
+first HTTP(S) URL; if no URL is present, non-empty shared text is captured as a
+text snippet. Shared images are captured as image items, streamed from the
+Android content URI to the API-issued upload target, then marked complete. The
+user can drop any payload immediately with no required fields. The share screen
+loads the authenticated `GET /tags` corpus
 when available, renders most-used tags as optional chips, accepts a free-text
 tag, and sends only selected or typed explicit tags.
 
@@ -15,10 +18,12 @@ contract: existing users can answer `SOFTWARE_TOKEN_MFA`, and users who need
 enrollment can complete `MFA_SETUP` from the one-time setup key before capture.
 The stored refresh token is used to refresh access tokens before API calls.
 
-URL capture calls `POST /items`; text capture calls `POST /items/text`. Both
-send selected explicit tags and a stable `client_capture_id` for the share
-attempt. The API client requires a fresh bearer token from the local auth
-boundary before making capture or tag corpus requests.
+URL capture calls `POST /items`; text capture calls `POST /items/text`; image
+capture calls `POST /items/images/uploads`, uploads bytes to the returned URL,
+then calls `POST /items/{id}/image-upload/complete`. All capture types send
+selected explicit tags and a stable `client_capture_id` for the share attempt.
+The API client requires a fresh bearer token from the local auth boundary before
+making capture or tag corpus requests.
 
 `make ci` runs both `android-structure-check` and a Gradle `:app:assembleDebug`
 compile through the checked-in wrapper. Set `ANDROID_HOME` or `ANDROID_SDK_ROOT`

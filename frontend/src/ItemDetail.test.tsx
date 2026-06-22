@@ -221,11 +221,55 @@ describe("ItemDetail link heading", () => {
   });
 });
 
+describe("ItemDetail images", () => {
+  it("loads_uploaded_images_into_the_detail_modal", async () => {
+    const originalCreateObjectUrl = URL.createObjectURL;
+    const originalRevokeObjectUrl = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn(() => "blob:image-preview");
+    URL.revokeObjectURL = vi.fn();
+    const loaded: string[] = [];
+    const detail = imageDetail();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <ItemDetail
+          availableTags={[]}
+          detail={detail}
+          onClose={() => undefined}
+          onCopyLink={() => undefined}
+          onLoadImage={async (itemId) => {
+            loaded.push(itemId);
+            return new Blob(["image"], { type: "image/jpeg" });
+          }}
+          onOpenSource={() => undefined}
+          onUpdateItem={async () => detail}
+        />
+      );
+      await Promise.resolve();
+    });
+
+    expect(loaded).toEqual(["image-1"]);
+    expect(container.querySelector("#detail-title")?.textContent).toBe("Phone transfer");
+    expect((container.querySelector(".image-detail-preview") as HTMLImageElement)?.src).toBe(
+      "blob:image-preview"
+    );
+    expect(container.querySelector(".image-download")?.getAttribute("download")).toBe("phone.jpg");
+    root.unmount();
+    container.remove();
+    URL.createObjectURL = originalCreateObjectUrl;
+    URL.revokeObjectURL = originalRevokeObjectUrl;
+  });
+});
+
 const itemDetail: LibraryItemDetail = {
   summary: {
     id: "item-1",
     item_kind: "text_snippet",
     url: null,
+    image: null,
     text: {
       plain_text: "copy this terminal output",
       preview: "copy this terminal output",
@@ -284,9 +328,35 @@ function linkDetail(id: string): LibraryItemDetail {
         copy_url: `https://example.com/${id}`,
       },
       text: null,
+      image: null,
       title: "Saved link",
       fetched_title: "Resolved metadata title",
       archive_status: "pending",
+    },
+  };
+}
+
+function imageDetail(): LibraryItemDetail {
+  return {
+    ...itemDetail,
+    summary: {
+      ...itemDetail.summary,
+      id: "image-1",
+      item_kind: "image",
+      url: null,
+      text: null,
+      image: {
+        s3_key: "images/image-1/original",
+        content_type: "image/jpeg",
+        original_filename: "phone.jpg",
+        byte_size: 2048,
+        upload_status: "uploaded",
+        source_app: "Android share",
+        source_device: "android",
+        capture_method: "android_share",
+      },
+      title: "Phone transfer",
+      archive_status: "succeeded",
     },
   };
 }

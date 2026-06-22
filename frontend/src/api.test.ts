@@ -180,6 +180,60 @@ describe("ApiClient item capture", () => {
   });
 });
 
+describe("ApiClient image capture", () => {
+  it("api_client_creates_completes_and_fetches_image_uploads", async () => {
+    const calls: CapturedRequest[] = [];
+    const client = new ApiClient({
+      baseUrl: "https://api.example.test",
+      getAccessToken: async () => "access-token",
+      fetchImpl: sequenceFetch(calls, [
+        jsonResponse({
+          item: itemDetail("image-1"),
+          created: true,
+          upload: {
+            url: "https://upload.example.test/images/image-1/original",
+            headers: { "content-type": "image/jpeg" },
+          },
+        }),
+        jsonResponse({ summary: itemSummary("image-1"), notes: "" }),
+        new Response("image", { status: 200, headers: { "content-type": "image/jpeg" } }),
+      ]),
+    });
+
+    await client.createImageUpload({
+      content_type: "image/jpeg",
+      title: "Phone image",
+      original_filename: "phone.jpg",
+      byte_size: 2048,
+      source_app: "Android share",
+      source_device: "android",
+      capture_method: "android_share",
+      tags: ["Photos"],
+      client_capture_id: "image-1",
+    });
+    await client.completeImageUpload("image-1");
+    await client.fetchImage("image-1");
+
+    expect(calls.map((call) => call.method)).toEqual(["POST", "POST", "GET"]);
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://api.example.test/items/images/uploads",
+      "https://api.example.test/items/image-1/image-upload/complete",
+      "https://api.example.test/items/image-1/image",
+    ]);
+    expect(JSON.parse(calls[0].body ?? "{}")).toEqual({
+      content_type: "image/jpeg",
+      title: "Phone image",
+      original_filename: "phone.jpg",
+      byte_size: 2048,
+      source_app: "Android share",
+      source_device: "android",
+      capture_method: "android_share",
+      tags: ["Photos"],
+      client_capture_id: "image-1",
+    });
+  });
+});
+
 describe("ApiClient auth", () => {
   it("api_client_refreshes_once_on_unauthorized", async () => {
     const calls: CapturedRequest[] = [];
@@ -270,6 +324,7 @@ function itemSummary(id: string) {
       copy_url: `https://example.com/${id}`,
     },
     text: null,
+    image: null,
     title: id,
     fetched_title: null,
     thumbnail_s3_key: null,

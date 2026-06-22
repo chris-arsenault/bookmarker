@@ -22,6 +22,7 @@ fn item(id: Uuid) -> LibraryItemDetail {
                 None,
             )),
             text: None,
+            image: None,
             title: Some("Example".to_string()),
             fetched_title: None,
             thumbnail_s3_key: None,

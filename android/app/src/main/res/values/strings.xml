@@ -13,7 +13,7 @@
     <string name="auth_setup_uri">Authenticator setup URI</string>
     <string name="auth_failed">Authentication failed</string>
     <string name="share_missing_url">No link found</string>
-    <string name="share_missing_payload">No link or text found</string>
+    <string name="share_missing_payload">No link, text, or image found</string>
     <string name="share_drop">Drop</string>
     <string name="share_cancel">Cancel</string>
     <string name="share_saved">Saved to Bookmarker</string>

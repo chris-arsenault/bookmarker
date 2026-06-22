@@ -38,7 +38,9 @@ export function ItemOrganizer({
     setSaving(true);
     setError("");
     try {
-      await onUpdateItem(detail.summary.id, organizationRequest(new FormData(event.currentTarget)));
+      const request = organizationRequest(new FormData(event.currentTarget));
+      const updated = await onUpdateItem(detail.summary.id, request);
+      confirmReturnedTitle(updated, request.title ?? "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "organization update failed");
     } finally {
@@ -51,15 +53,8 @@ export function ItemOrganizer({
       onSubmit={submit}
     >
       <h3>Edit item</h3>
-      <label className="organizer-field">
-        Notes
-        <textarea
-          defaultValue={detail.notes}
-          disabled={saving}
-          name="notes"
-          rows={density === "compact" ? 2 : 4}
-        />
-      </label>
+      <TitleField disabled={saving} title={detail.summary.title} />
+      <NotesField density={density} disabled={saving} notes={detail.notes} />
       <TagEditor
         availableTags={availableTags}
         disabled={saving}
@@ -85,6 +80,42 @@ export function ItemOrganizer({
       </button>
     </form>
   );
+}
+
+function TitleField({ title, disabled }: { title: string | null; disabled: boolean }) {
+  return (
+    <label className="organizer-field">
+      Title
+      <input
+        defaultValue={title ?? ""}
+        disabled={disabled}
+        name="title"
+        placeholder="Untitled"
+        type="text"
+      />
+    </label>
+  );
+}
+
+function NotesField({
+  notes,
+  density,
+  disabled,
+}: {
+  notes: string;
+  density: OrganizerDensity;
+  disabled: boolean;
+}) {
+  return (
+    <label className="organizer-field">
+      Notes
+      <textarea defaultValue={notes} disabled={disabled} name="notes" rows={notesRows(density)} />
+    </label>
+  );
+}
+
+function notesRows(density: OrganizerDensity) {
+  return density === "compact" ? 2 : 4;
 }
 
 function StatusChoices<T extends string>({
@@ -121,11 +152,23 @@ function StatusChoices<T extends string>({
 
 function organizationRequest(formData: FormData): UpdateItemRequest {
   return {
+    title: formValue(formData, "title"),
     watch_status: formValue(formData, "watch_status") as WatchStatus,
     inbox_status: formValue(formData, "inbox_status") as InboxStatus,
     notes: formValue(formData, "notes"),
     tags: selectedTagsFromForm(formData),
   };
+}
+
+function confirmReturnedTitle(detail: LibraryItemDetail, title: string) {
+  if (detail.summary.title !== cleanTitle(title)) {
+    throw new Error("Title save did not persist. The API may need to be deployed.");
+  }
+}
+
+function cleanTitle(title: string) {
+  const cleaned = title.trim();
+  return cleaned ? cleaned : null;
 }
 
 function formValue(formData: FormData, name: string) {

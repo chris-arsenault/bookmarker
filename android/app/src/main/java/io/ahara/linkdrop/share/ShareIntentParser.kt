@@ -1,14 +1,25 @@
 package io.ahara.linkdrop.share
 
 import android.content.Intent
+import android.net.Uri
 
 object ShareIntentParser {
     private val urlPattern = Regex("""https?://\S+""")
 
-    fun parse(intent: Intent): SharedCapture? {
-        if (intent.action != Intent.ACTION_SEND || !intent.type.orEmpty().startsWith("text/")) {
-            return null
+    fun parse(intent: Intent): List<SharedCapture> {
+        val type = intent.type.orEmpty()
+        return when {
+            intent.action == Intent.ACTION_SEND && type.startsWith("text/") ->
+                parseText(intent)?.let(::listOf).orEmpty()
+            intent.action == Intent.ACTION_SEND && type.startsWith("image/") ->
+                parseSingleImage(intent, type)?.let(::listOf).orEmpty()
+            intent.action == Intent.ACTION_SEND_MULTIPLE && type.startsWith("image/") ->
+                parseMultipleImages(intent, type)
+            else -> emptyList()
         }
+    }
+
+    private fun parseText(intent: Intent): SharedCapture? {
         val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty().trim()
         val urlMatch = urlPattern.find(text)
         if (urlMatch != null) {
@@ -21,7 +32,21 @@ object ShareIntentParser {
     }
 
     fun parseUrl(intent: Intent): String? {
-        return (parse(intent) as? SharedCapture.Url)?.url
+        return (parse(intent).firstOrNull() as? SharedCapture.Url)?.url
+    }
+
+    @Suppress("DEPRECATION")
+    private fun parseSingleImage(intent: Intent, type: String): SharedCapture.Image? {
+        val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM) ?: return null
+        return SharedCapture.Image(uri = uri, contentType = type, title = imageTitle(intent))
+    }
+
+    @Suppress("DEPRECATION")
+    private fun parseMultipleImages(intent: Intent, type: String): List<SharedCapture.Image> {
+        val uris = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM).orEmpty()
+        return uris.map { uri ->
+            SharedCapture.Image(uri = uri, contentType = type, title = imageTitle(intent))
+        }
     }
 
     private fun sharedTitle(intent: Intent, text: String, urlMatch: MatchResult): String? {
@@ -44,6 +69,10 @@ object ShareIntentParser {
             .orEmpty()
         return trimmed.takeIf { it.isNotBlank() && urlPattern.find(it) == null }
     }
+
+    private fun imageTitle(intent: Intent): String? =
+        cleanTitle(intent.getStringExtra(Intent.EXTRA_TITLE))
+            ?: cleanTitle(intent.getStringExtra(Intent.EXTRA_SUBJECT))
 }
 
 sealed class SharedCapture {
@@ -55,5 +84,14 @@ sealed class SharedCapture {
 
     data class Text(val plainText: String) : SharedCapture() {
         override val preview = plainText
+    }
+
+    data class Image(
+        val uri: Uri,
+        val contentType: String,
+        val title: String?,
+    ) : SharedCapture() {
+        override val preview = listOfNotNull(title, uri.lastPathSegment).joinToString("\n")
+            .ifBlank { uri.toString() }
     }
 }

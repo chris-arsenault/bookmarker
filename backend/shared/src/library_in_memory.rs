@@ -6,17 +6,14 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::auth::UserContext;
-use crate::domain::{ArchiveStatus, InboxStatus, ItemKind, SubmittedUrl, WatchStatus};
 use crate::error::{AppError, AppResult};
-use crate::url_normalization::{
-    normalize_url_with_resolver, HttpShortUrlResolver, NormalizedUrl, ShortUrlResolver,
-};
+use crate::url_normalization::{HttpShortUrlResolver, ShortUrlResolver};
 
 use super::library_query::item_matches_query;
 use super::{
-    CaptureItemOutcome, CaptureItemRequest, CaptureTextRequest, ItemTag, ItemUrlSummary,
-    LibraryItemDetail, LibraryItemSummary, LibraryService, LibraryUpdates, ListItemUpdatesQuery,
-    ListItemsQuery, MergeTagsRequest, RenameTagRequest, TagCorpusEntry, UpdateItemRequest,
+    CaptureItemOutcome, CaptureItemRequest, CaptureTextRequest, LibraryItemDetail,
+    LibraryItemSummary, LibraryService, LibraryUpdates, ListItemUpdatesQuery, ListItemsQuery,
+    MergeTagsRequest, RenameTagRequest, TagCorpusEntry, UpdateItemRequest,
 };
 
 pub struct InMemoryLibraryService {
@@ -32,10 +29,14 @@ type CaptureIdsByUser = HashMap<String, HashMap<String, Uuid>>;
 
 #[path = "library_in_memory_delete.rs"]
 mod library_in_memory_delete;
+#[path = "library_in_memory_image.rs"]
+mod library_in_memory_image;
 #[path = "library_in_memory_text.rs"]
 mod library_in_memory_text;
 #[path = "library_in_memory_update.rs"]
 mod library_in_memory_update;
+#[path = "library_in_memory_url.rs"]
+mod library_in_memory_url;
 #[path = "library_in_memory_tag_ops.rs"]
 mod tag_ops;
 
@@ -87,45 +88,7 @@ impl LibraryService for InMemoryLibraryService {
         user: &UserContext,
         request: CaptureItemRequest,
     ) -> AppResult<CaptureItemOutcome> {
-        let CaptureItemRequest {
-            url,
-            title,
-            tags,
-            client_capture_id,
-        } = request;
-        let original_url = SubmittedUrl::new(url)
-            .map_err(validation_error)?
-            .into_string();
-        let client_capture_id = validate_client_capture_id(client_capture_id)?;
-        if let Some(item) = self.existing_capture(user, client_capture_id.as_deref())? {
-            return Ok(CaptureItemOutcome {
-                item,
-                created: false,
-            });
-        }
-
-        let normalized_url =
-            normalize_url_with_resolver(&original_url, self.url_resolver.as_ref()).await;
-        if let Some(item) =
-            self.existing_canonical_capture(user, normalized_url.canonical_url.as_deref())
-        {
-            return Ok(CaptureItemOutcome {
-                item,
-                created: false,
-            });
-        }
-
-        let item = self.new_capture_item(
-            original_url,
-            normalized_url,
-            clean_optional(title),
-            tag_ops::capture_tags(&self.tags_by_user, &user.sub, &tags)?,
-        );
-        self.store_capture(user, client_capture_id, item.clone());
-        Ok(CaptureItemOutcome {
-            item,
-            created: true,
-        })
+        library_in_memory_url::capture_url(self, user, request).await
     }
 
     async fn capture_text(
@@ -134,6 +97,22 @@ impl LibraryService for InMemoryLibraryService {
         request: CaptureTextRequest,
     ) -> AppResult<CaptureItemOutcome> {
         library_in_memory_text::capture_text(self, user, request).await
+    }
+
+    async fn capture_image_upload(
+        &self,
+        user: &UserContext,
+        request: super::CaptureImageUploadRequest,
+    ) -> AppResult<CaptureItemOutcome> {
+        library_in_memory_image::capture_image_upload(self, user, request).await
+    }
+
+    async fn complete_image_upload(
+        &self,
+        user: &UserContext,
+        item_id: Uuid,
+    ) -> AppResult<LibraryItemDetail> {
+        library_in_memory_image::complete_image_upload(self, user, item_id)
     }
 
     async fn list_items(
@@ -269,60 +248,6 @@ impl InMemoryLibraryService {
         item_id
             .map(|item_id| self.find_item(user, item_id))
             .transpose()
-    }
-
-    fn existing_canonical_capture(
-        &self,
-        user: &UserContext,
-        canonical_url: Option<&str>,
-    ) -> Option<LibraryItemDetail> {
-        let canonical_url = canonical_url?;
-        self.items_by_user
-            .lock()
-            .unwrap()
-            .get(&user.sub)
-            .and_then(|items| {
-                items
-                    .iter()
-                    .find(|item| {
-                        item.summary
-                            .url
-                            .as_ref()
-                            .and_then(|url| url.canonical_url.as_deref())
-                            == Some(canonical_url)
-                    })
-                    .cloned()
-            })
-    }
-
-    fn new_capture_item(
-        &self,
-        original_url: String,
-        normalized_url: NormalizedUrl,
-        title: Option<String>,
-        tags: Vec<ItemTag>,
-    ) -> LibraryItemDetail {
-        let NormalizedUrl { canonical_url, .. } = normalized_url;
-        LibraryItemDetail {
-            summary: LibraryItemSummary {
-                id: Uuid::new_v4(),
-                item_kind: ItemKind::Url,
-                url: Some(ItemUrlSummary::new(original_url, canonical_url)),
-                text: None,
-                title,
-                fetched_title: None,
-                thumbnail_s3_key: None,
-                author: None,
-                platform: None,
-                duration_seconds: None,
-                archive_status: ArchiveStatus::Pending,
-                watch_status: WatchStatus::Unwatched,
-                inbox_status: InboxStatus::Unsorted,
-                tags,
-                created_at: OffsetDateTime::now_utc(),
-            },
-            notes: String::new(),
-        }
     }
 
     fn store_capture(

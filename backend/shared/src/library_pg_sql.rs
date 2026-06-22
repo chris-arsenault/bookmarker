@@ -14,9 +14,17 @@ pub(super) const ITEM_SELECT: &str = "
         item_texts.plain_text,
         item_texts.html_content,
         item_texts.content_hash,
-        item_texts.source_app,
-        item_texts.source_device,
-        item_texts.capture_method,
+        item_texts.source_app AS text_source_app,
+        item_texts.source_device AS text_source_device,
+        item_texts.capture_method AS text_capture_method,
+        item_images.s3_key AS image_s3_key,
+        item_images.content_type AS image_content_type,
+        item_images.original_filename AS image_original_filename,
+        item_images.byte_size AS image_byte_size,
+        item_images.upload_status AS image_upload_status,
+        item_images.source_app AS image_source_app,
+        item_images.source_device AS image_source_device,
+        item_images.capture_method AS image_capture_method,
         items.title,
         metadata_snapshots.title AS fetched_title,
         metadata_snapshots.thumbnail_s3_key,
@@ -25,6 +33,12 @@ pub(super) const ITEM_SELECT: &str = "
         metadata_snapshots.duration_seconds,
         CASE
             WHEN items.item_kind = 'text_snippet' THEN 'not_applicable'
+            WHEN items.item_kind = 'image' THEN
+                CASE item_images.upload_status
+                    WHEN 'uploaded' THEN 'succeeded'
+                    WHEN 'failed' THEN 'failed'
+                    ELSE 'pending'
+                END
             ELSE COALESCE(metadata_snapshots.archive_status, 'pending')
         END AS archive_status,
         items.watch_status,
@@ -35,12 +49,14 @@ pub(super) const ITEM_SELECT: &str = "
             items.updated_at,
             COALESCE(item_urls.updated_at, items.updated_at),
             COALESCE(item_texts.updated_at, items.updated_at),
+            COALESCE(item_images.updated_at, items.updated_at),
             COALESCE(metadata_snapshots.updated_at, items.updated_at),
             COALESCE(item_notes.updated_at, items.updated_at)
         ) AS update_cursor
     FROM items
     LEFT JOIN item_urls ON item_urls.item_id = items.id
     LEFT JOIN item_texts ON item_texts.item_id = items.id
+    LEFT JOIN item_images ON item_images.item_id = items.id
     LEFT JOIN metadata_snapshots ON metadata_snapshots.item_id = items.id
     LEFT JOIN item_notes ON item_notes.item_id = items.id
     WHERE items.user_id = $1";
@@ -58,7 +74,18 @@ pub(super) const LIST_ITEMS: &str = "
       )
       AND ($4::timestamptz IS NULL OR items.created_at >= $4)
       AND ($5::timestamptz IS NULL OR items.created_at <= $5)
-      AND ($6::text IS NULL OR COALESCE(metadata_snapshots.archive_status, 'pending') = $6)
+      AND ($6::text IS NULL OR
+        CASE
+            WHEN items.item_kind = 'text_snippet' THEN 'not_applicable'
+            WHEN items.item_kind = 'image' THEN
+                CASE item_images.upload_status
+                    WHEN 'uploaded' THEN 'succeeded'
+                    WHEN 'failed' THEN 'failed'
+                    ELSE 'pending'
+                END
+            ELSE COALESCE(metadata_snapshots.archive_status, 'pending')
+        END = $6
+      )
       AND ($7::text IS NULL OR items.watch_status = $7)
       AND ($8::text IS NULL OR items.inbox_status = $8)
       AND (
@@ -67,6 +94,7 @@ pub(super) const LIST_ITEMS: &str = "
         OR strpos(lower(COALESCE(metadata_snapshots.title, '')), $9) > 0
         OR strpos(lower(COALESCE(item_notes.body, '')), $9) > 0
         OR strpos(lower(COALESCE(item_texts.plain_text, '')), $9) > 0
+        OR strpos(lower(COALESCE(item_images.original_filename, '')), $9) > 0
       )";
 pub(super) const LIST_ITEMS_ORDER: &str = "
     ORDER BY items.created_at DESC, items.id";
@@ -84,7 +112,18 @@ pub(super) const LIST_ITEM_UPDATES: &str = "
       )
       AND ($4::timestamptz IS NULL OR items.created_at >= $4)
       AND ($5::timestamptz IS NULL OR items.created_at <= $5)
-      AND ($6::text IS NULL OR COALESCE(metadata_snapshots.archive_status, 'pending') = $6)
+      AND ($6::text IS NULL OR
+        CASE
+            WHEN items.item_kind = 'text_snippet' THEN 'not_applicable'
+            WHEN items.item_kind = 'image' THEN
+                CASE item_images.upload_status
+                    WHEN 'uploaded' THEN 'succeeded'
+                    WHEN 'failed' THEN 'failed'
+                    ELSE 'pending'
+                END
+            ELSE COALESCE(metadata_snapshots.archive_status, 'pending')
+        END = $6
+      )
       AND ($7::text IS NULL OR items.watch_status = $7)
       AND ($8::text IS NULL OR items.inbox_status = $8)
       AND (
@@ -93,11 +132,13 @@ pub(super) const LIST_ITEM_UPDATES: &str = "
         OR strpos(lower(COALESCE(metadata_snapshots.title, '')), $9) > 0
         OR strpos(lower(COALESCE(item_notes.body, '')), $9) > 0
         OR strpos(lower(COALESCE(item_texts.plain_text, '')), $9) > 0
+        OR strpos(lower(COALESCE(item_images.original_filename, '')), $9) > 0
       )
       AND GREATEST(
         items.updated_at,
         COALESCE(item_urls.updated_at, items.updated_at),
         COALESCE(item_texts.updated_at, items.updated_at),
+        COALESCE(item_images.updated_at, items.updated_at),
         COALESCE(metadata_snapshots.updated_at, items.updated_at),
         COALESCE(item_notes.updated_at, items.updated_at)
       ) > $10
@@ -118,6 +159,10 @@ pub(super) const GET_ITEM_BY_CANONICAL_URL: &str = "
       AND item_urls.canonical_url = $2";
 pub(super) const GET_ITEM_BY_TEXT_HASH: &str = "
       AND item_texts.content_hash = $2";
+pub(super) const UPDATE_IMAGE_UPLOAD_STATUS: &str = "
+    UPDATE item_images
+    SET upload_status = $3, updated_at = now()
+    WHERE item_id = $1 AND user_id = $2";
 pub(super) const ITEM_TAGS: &str = "
     SELECT tags.id, tags.display_name, tags.normalized_name
     FROM item_tags
@@ -140,6 +185,7 @@ pub(super) const UPDATE_ITEM_ORGANIZATION: &str = "
     SET
         watch_status = COALESCE($3, watch_status),
         inbox_status = COALESCE($4, inbox_status),
+        title = CASE WHEN $5 THEN $6 ELSE title END,
         updated_at = now()
     WHERE id = $1 AND user_id = $2";
 pub(super) const UPSERT_ITEM_NOTE: &str = "
@@ -189,6 +235,19 @@ pub(super) const INSERT_TEXT_CAPTURE: &str = "
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     ON CONFLICT (user_id, content_hash)
     DO NOTHING";
+pub(super) const INSERT_IMAGE_CAPTURE: &str = "
+    INSERT INTO item_images (
+        item_id,
+        user_id,
+        s3_key,
+        content_type,
+        original_filename,
+        byte_size,
+        source_app,
+        source_device,
+        capture_method
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
 pub(super) const UPSERT_TAG: &str = "
     INSERT INTO tags (user_id, display_name)
     VALUES ($1, $2)
