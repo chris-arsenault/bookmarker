@@ -1,5 +1,5 @@
 import type { LibraryState } from "./libraryState";
-import type { ApiDateTime, LibraryItemSummary, LibraryUpdates } from "./types";
+import type { ApiDateTime, LibraryItemDetail, LibraryItemSummary, LibraryUpdates } from "./types";
 import { parseApiDate } from "./dateDisplay";
 
 export const ACTIVE_UPDATE_POLL_MS = 8_000;
@@ -57,14 +57,14 @@ function updatedSelectedItemId(
 }
 
 function mergeSelectedDetail(
-  detail: Extract<LibraryState, { status: "ready" }>["selectedDetail"],
+  detail: LibraryItemDetail | null,
   updates: LibraryUpdates
-) {
-  if (detail && updates.deleted_item_ids.includes(detail.summary.id)) {
+): LibraryItemDetail | null {
+  if (!detail || updates.deleted_item_ids.includes(detail.summary.id)) {
     return null;
   }
   const summary = detail ? updates.items.find((item) => item.id === detail.summary.id) : undefined;
-  return summary ? { ...detail, summary } : detail;
+  return summary ? { summary, notes: detail.notes } : detail;
 }
 
 function compareCreatedDesc(left: LibraryItemSummary, right: LibraryItemSummary) {
