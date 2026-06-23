@@ -20,8 +20,7 @@ Failures are terminal and visible rather than destructive: extraction or
 snapshot errors upsert `archive_status = failed`, preserve the saved item, and
 record a safe error string. Successful runs write `archive_status = succeeded`.
 
-M5 provides the crate and S3 snapshot-store implementation. M8 wires the
-deployed processing Lambda, runtime IAM, private snapshot bucket, and
-CloudWatch Lambda alarms through Terraform. The API invokes this Lambda
-asynchronously through `PROCESSING_FUNCTION_NAME`, and clients read snapshots
-through the authenticated API thumbnail route.
+The deployed processing Lambda receives runtime IAM, private snapshot bucket
+access, and CloudWatch Lambda alarms through Terraform. The API invokes this
+Lambda asynchronously through `PROCESSING_FUNCTION_NAME`, and clients read
+snapshots through the authenticated API thumbnail route.

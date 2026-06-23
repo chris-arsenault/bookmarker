@@ -1,174 +1,155 @@
 # Architecture
 
-Linkdrop is organized as a standard Ahara product repo with a native Android client.
+Bookmarker is an Ahara product repo for personal capture and short-term recall.
+The deployed platform key remains `linkdrop`, which provides the public app URL,
+API URL, database name, Cognito app client, and Terraform resource prefix.
 
 ## Components
 
-| Component | Responsibility |
-| ---- | ---- |
-| `android/` | Native Android `ACTION_SEND` client for authenticated quick-drop capture. |
-| `backend/api` | Authenticated Rust HTTP API Lambda behind the shared Ahara ALB. |
-| `backend/processing` | Async metadata enrichment Lambda and thumbnail snapshot storage boundary. |
-| `backend/shared` | Shared crate for platform identity, runtime config, Cognito auth, public errors, database helpers, M1 migration constants, domain types, and library services. |
-| `frontend/` | Cognito-authenticated Vite React/TypeScript web vault plus Electron desktop shell entrypoints for private browsing, filtering, organization, source opening, copy actions, clipboard capture, HUD display, and snapshot thumbnails. |
-| `db/migrations/` | Defines the PostgreSQL model for items, URLs, explicit tags, tag usage, notes, archive snapshots, and processing state. |
-| `infrastructure/terraform/` | Project Terraform root for Ahara platform resources. |
+| Component                   | Responsibility                                                                                                                                                 |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `android/`                  | Native Android `ACTION_SEND` and `ACTION_SEND_MULTIPLE` client for authenticated URL, text, and image capture.                                                 |
+| `backend/api`               | Authenticated Rust HTTP API Lambda behind the shared Ahara ALB.                                                                                                |
+| `backend/processing`        | Async URL metadata enrichment Lambda and thumbnail snapshot writer.                                                                                            |
+| `backend/shared`            | Shared Rust crate for platform identity, runtime config, Cognito auth, public errors, database helpers, domain types, URL normalization, and library services. |
+| `frontend/`                 | Cognito-authenticated Vite React vault plus Electron desktop shell entrypoints for browsing, capture, copy actions, image retrieval, and HUD workflows.        |
+| `db/migrations/`            | PostgreSQL migrations for items, URL/text/image payloads, explicit tags, notes, snapshots, processing state, and capture idempotency.                          |
+| `infrastructure/terraform/` | Project Terraform root for Ahara website, API, processing, Cognito client, snapshot storage, runtime config, and alarms.                                       |
 
 ## Platform integration
 
 The API runs as a Rust Lambda behind the shared Ahara ALB through the
-`alb-api` module. `GET /health` is public; all other API routes are protected by
-the shared ALB JWT validation action. The async enrichment worker runs as a
-standalone Lambda through the Ahara `lambda` module, and the API invokes it
-best effort through `PROCESSING_FUNCTION_NAME`.
+`alb-api` module. `GET /health` is public. Authenticated API routes use the
+shared ALB JWT validation action and the shared Cognito pool.
 
-Terraform uses the shared `platform-context`, `alb-api`, `lambda`, `website`,
-and `cognito-app` modules from `ahara-tf-patterns`. It reads shared VPC, ALB,
-Cognito, Route 53, and RDS context rather than creating per-project platform
-infrastructure. The backend uses the shared PostgreSQL/RDS instance with a
-per-project database named `linkdrop`. Web and Android clients use the shared
-Cognito pool through the Linkdrop app client. The app client is registered with
-the platform auth trigger through `/ahara/auth-trigger/clients/linkdrop-app`.
+The web app is deployed through the Ahara `website` module. Web, desktop, and
+Android clients authenticate through the Linkdrop public Cognito app client
+named `linkdrop-app`. The app client is registered with the platform auth
+trigger through `/ahara/auth-trigger/clients/linkdrop-app`.
 
-## Current API surface
+Terraform consumes shared VPC, ALB, Cognito, Route 53, RDS, and state-bucket
+context through `ahara-tf-patterns` modules. The backend uses the shared
+PostgreSQL/RDS instance with a per-project database named `linkdrop`.
 
-M7 exposes authenticated quick-drop capture, filtered item/tag reads,
-organization mutations, tag cleanup, API-mediated thumbnail snapshot reads, and
-capture-time dispatch into asynchronous processing:
+## API surface
 
-| Route | Auth | Contract |
-| ---- | ---- | ---- |
-| `GET /health` | No | Return service health. |
-| `GET /me` | Yes | Return the authenticated Cognito user context. |
-| `POST /items` | Yes | Capture a URL with optional explicit tags and optional `client_capture_id`. |
-| `POST /items/text` | Yes | Capture a text snippet with optional explicit tags, source metadata, and optional `client_capture_id`. |
-| `GET /items` | Yes | Return item summaries scoped to the current user, with optional platform, tag, date, archive status, watched status, inbox status, and text filters. |
-| `GET /items/{item_id}` | Yes | Return item detail scoped to the current user. |
-| `GET /items/{item_id}/thumbnail` | Yes | Return Linkdrop-owned thumbnail snapshot bytes for an owned item. |
-| `GET /tags` | Yes | Return the current user's explicit tag corpus. |
-| `PATCH /items/{item_id}` | Yes | Update notes, explicit tags, `watch_status`, and `inbox_status` for an existing item. |
-| `PATCH /tags/{tag_id}` | Yes | Rename a tag when the normalized destination does not collide. |
-| `POST /tags/{source_tag_id}/merge` | Yes | Merge a source tag into a different target tag. |
+| Route                                         | Auth | Contract                                                                                             |
+| --------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------- |
+| `GET /health`                                 | No   | Return service health.                                                                               |
+| `GET /me`                                     | Yes  | Return the authenticated Cognito user context.                                                       |
+| `POST /items`                                 | Yes  | Capture a URL with optional title, explicit tags, and `client_capture_id`.                           |
+| `POST /items/text`                            | Yes  | Capture a text snippet with optional title, source metadata, explicit tags, and `client_capture_id`. |
+| `POST /items/images/uploads`                  | Yes  | Create an image item and return an authenticated upload target.                                      |
+| `POST /items/{item_id}/image-upload/complete` | Yes  | Mark an owned image item as uploaded after object storage receives the bytes.                        |
+| `GET /items`                                  | Yes  | Return item summaries scoped to the current user, with optional library filters.                     |
+| `GET /items/updates`                          | Yes  | Return changed item summaries and tombstones after a cursor for polling clients.                     |
+| `GET /items/{item_id}`                        | Yes  | Return item detail scoped to the current user.                                                       |
+| `GET /items/{item_id}/thumbnail`              | Yes  | Return Linkdrop-owned thumbnail snapshot bytes for an owned URL item.                                |
+| `GET /items/{item_id}/image`                  | Yes  | Return uploaded image bytes for an owned image item.                                                 |
+| `PATCH /items/{item_id}`                      | Yes  | Update title, notes, explicit tags, `watch_status`, and `inbox_status`.                              |
+| `DELETE /items/{item_id}`                     | Yes  | Delete an owned item and surface the deletion through update polling.                                |
+| `GET /tags`                                   | Yes  | Return the current user's explicit tag corpus.                                                       |
+| `PATCH /tags/{tag_id}`                        | Yes  | Rename a tag when the normalized destination is available.                                           |
+| `POST /tags/{source_tag_id}/merge`            | Yes  | Merge a source tag into a different target tag.                                                      |
 
 Every authenticated route uses the shared Cognito verifier. Public API errors
 use a stable JSON shape with a safe `code` and `message`.
 
+## Item model
+
+`items` is the durable root for every saved object. Payload-specific data lives
+in sibling tables:
+
+| Payload      | Table         | Notes                                                                                       |
+| ------------ | ------------- | ------------------------------------------------------------------------------------------- |
+| URL          | `item_urls`   | Original URL, canonical URL, normalization status, and copy URL source.                     |
+| Text snippet | `item_texts`  | Plain text, optional HTML/source metadata, preview text, and content hash.                  |
+| Image        | `item_images` | Object key, content type, original filename, byte size, upload status, and source metadata. |
+
+Shared organization data remains on the item: user title, explicit tags, notes,
+watched state, inbox state, creation time, update time, and deletion state.
+ADRs [0004](adr/0004-general-content-items.md) and
+[0005](adr/0005-image-transfer-items.md) record the payload-table decisions.
+Captured items land in `inbox_status = unsorted`; users move them to
+`organized` after capture. User-entered titles live on `items.title`. Provider
+titles from URL enrichment live separately as `metadata_snapshots.title` and
+are surfaced to clients as `fetched_title`.
+
 ## Capture model
 
-Capture is write-first. `POST /items` persists a quick-drop record as soon as it
-receives a URL and optional explicit tags. Android supplies a stable
-`client_capture_id` per share attempt so user retries return the existing item
-instead of creating another pending item.
+Capture is write-first. URL and text captures persist as soon as the API
+validates the required payload field. Image capture creates a pending image item
+and returns an upload target; the client uploads the bytes and then completes
+the upload. Clients may send a stable `client_capture_id` so retries return the
+existing item instead of creating another item.
 
-M4 normalizes URLs during capture for storage, deduplication, and copy behavior.
-Tracking parameters are stripped, `youtu.be` is converted without network
-access, and share/meta or short-link hosts such as `share.google.com`,
-`vt.tiktok.com`, and common shorteners are resolved through a bounded
-best-effort resolver. If short-link resolution fails, capture still saves the
-item with the original URL and a `copy_url` fallback.
+URL capture stores the original submitted URL and, when normalization succeeds,
+a canonical URL. Canonicalization strips common tracking parameters, converts
+`youtu.be` without network access, and resolves known share/meta or short-link
+hosts through a bounded best-effort resolver. `url.copy_url` is the canonical
+URL when available and the original URL when normalization falls back.
 
-M5 processing updates the same record after metadata enrichment and snapshot
-archival. The API queues processing best effort after capture commits; dispatch
-failure never changes the capture response.
+The tag corpus is derived only from explicit item-tag associations. Chip
+ranking uses tag usage counts from that corpus and starts empty for a new
+account.
 
-The tag corpus is derived from explicit item-tag associations. Chip ranking uses
-usage counts from that corpus and starts empty on a new install. New captures
-land with `inbox_status = unsorted`; `organized` is set later by deliberate
-user action.
+## Enrichment and archives
 
-User-entered titles live on `items.title` for both URL captures and text
-snippets. Fetched provider titles live separately as `metadata_snapshots.title`
-and are surfaced to clients as `fetched_title`, so enrichment never overwrites a
-capture-time title.
+URL capture queues the processing Lambda after the database write. Processing
+extracts provider or OpenGraph metadata best effort, stores fetched title,
+author/channel, platform, optional duration, archive status, and safe error
+text in `metadata_snapshots`, and writes thumbnail bytes to a Linkdrop-owned
+private snapshot bucket when a thumbnail is available.
 
-## Database and domain model
+The database stores thumbnail snapshot keys and content types. Clients load
+snapshots through authenticated API routes that check item ownership before
+reading object storage.
 
-M1 defines `users`, `items`, `item_urls`, `tags`, `item_tags`,
-`tag_usage_counts`, `item_notes`, `metadata_snapshots`, and `processing_jobs`
-in PostgreSQL. Rollback SQL removes those project-owned objects in reverse
-dependency order.
+## Web and desktop UI
 
-M3 adds `items.client_capture_id` with per-user uniqueness for retry-safe
-capture attempts.
+The web UI is a Cognito-authenticated vault workspace for URL, text, and image
+items. It renders a table-oriented feed and modal detail surface with title,
+source/platform, explicit tags, date added, archive status, watched state,
+inbox state, notes, text Markdown rendering, image preview/download, and
+thumbnail snapshots.
 
-M7 adds `items.inbox_status`, defaulting to `unsorted` with an `organized`
-state for deliberate filing. The shared Rust domain exposes `SubmittedUrl`,
-`TagName`, `ItemKind`, `TextSnippetBody`, `ArchiveStatus`, `WatchStatus`,
-`InboxStatus`, `ProcessingJobKind`, and `ProcessingStatus`. The vault extension
-adds `items.item_kind` and `item_texts` so URL captures and text snippets share
-item organization while keeping payload-specific storage. `SubmittedUrl` validates
-absolute HTTP(S) URLs without stripping query parameters or resolving
-shorteners. `TextSnippetBody` rejects blank snippets while preserving submitted
-text. `TagName` trims explicit user-entered text and derives the corpus key from
-that text only.
+The item list supports filters for platform, explicit tag, added date range,
+archive status, watched state, inbox state, and free-text search over user
+title, fetched title, snippet text, filename, and notes. The detail modal
+supports click-to-edit titles, blur-saved notes, chip-based tag selection,
+status icon popovers, source opening, copy actions, and custom delete
+confirmation.
 
-## URL and archive model
-
-Each item stores the original submitted URL and, when normalization succeeds, a
-canonical URL. Deduplication uses the normalized canonical URL, so repeated
-captures of equivalent links surface the existing item instead of creating
-duplicates. API item summaries and detail responses include `copy_url`, which is
-the canonical URL when present and the original URL when normalization is failed
-or pending.
-
-Thumbnail, fetched title, author/channel, platform, duration, and archive status
-are stored as snapshot fields in `metadata_snapshots`. The processing Lambda
-fetches metadata best effort, writes `archive_status` as `pending`, `succeeded`,
-or `failed`, and leaves failed sources saved and queryable. When a thumbnail is
-available, it is downloaded and stored through a Linkdrop-owned snapshot store;
-the database keeps `thumbnail_s3_key` and content type, not the source thumbnail
-hotlink. Web clients read thumbnails through the authenticated API, which checks
-item ownership before loading the stored snapshot object.
-
-## Web UI
-
-The web UI is a Cognito-authenticated vault workspace. It renders URL items and
-text snippets in one feed/detail panel with title/preview, platform/source app,
-explicit tags, date added, `archive_status`, watched status, `inbox_status`,
-notes, and API-mediated thumbnail snapshots when available. It supports filters
-for platform, explicit tag, added date range, archive status, watched status,
-inbox status, and free-text user-title/fetched-title/snippet/notes search.
-
-Item actions open the source link for URL items, copy `url.copy_url` for URL
-items, and copy `text.plain_text` for text snippets. M6 uses source deep-links
-instead of provider embeds because the current URL backend contract exposes
-canonical/live source URLs, not provider embed URLs.
-
-The Electron desktop shell loads the built frontend, exposes clipboard read and
-write IPC through a preload bridge, adds a tray entry for explicit clipboard
-capture, and provides a compact always-on-top HUD for copying recent unsorted
-items without global keybinding overload.
-
-M7 organization happens after capture in the detail panel. Users can edit notes,
-replace explicit item tags, toggle watched/unwatched, and move items between
-unsorted and organized. The tag management panel supports tag rename and tag
-merge for explicit corpus cleanup; merge moves source associations to the
-target and relies on database usage counts for chip ranking.
+The Electron desktop shell loads the same web app, persists desktop auth state
+through the Electron storage boundary, exposes clipboard read/write IPC through
+a preload bridge, adds a tray entry for explicit clipboard capture, and
+provides a compact always-on-top HUD for recent unsorted items.
 
 ## Android UI
 
-The Android app registers an `ACTION_SEND` share destination for text payloads.
-It extracts a shared URL when present; otherwise non-empty shared text is saved
-as a text snippet. It allows immediate save with no required fields, loads
-optional explicit tag chips from the user's corpus, accepts one free-text tag,
-and shows a non-blocking confirmation toast. The app signs in against the
-shared Ahara Cognito pool through the Linkdrop public app client, stores tokens
-locally, refreshes access tokens before API calls, and supports the platform
-software-token `SOFTWARE_TOKEN_MFA` and `MFA_SETUP` challenge states.
+The Android app registers share destinations for text and image payloads. Text
+shares are parsed for the first HTTP(S) URL; text without a URL is captured as a
+text snippet. Image shares create image upload items and stream the Android
+content URI to the API-issued upload target. Multiple shared images are captured
+as separate image items.
+
+The share screen allows immediate save with optional explicit tag chips and one
+free-text tag. The app signs in against the shared Ahara Cognito pool through
+the Linkdrop public app client, stores tokens locally, refreshes access tokens
+before API calls, and supports the platform software-token MFA challenge flow.
 
 ## Operations
 
-The deployment root creates the website, API Lambda, processing Lambda,
+The Terraform root creates the website, API Lambda, processing Lambda,
 Linkdrop public Cognito client, auth-trigger SSM mapping, private snapshot
 bucket, runtime config, and CloudWatch `Errors`/`Throttles` alarms for both
-Lambdas. The snapshot bucket is private, blocks public access, uses server-side
-encryption, and keeps versioning enabled because thumbnails are the archived
-copy.
+Lambdas. The snapshot bucket is private, blocks public access, uses
+server-side encryption, and keeps versioning enabled because thumbnails and
+uploaded images are project-owned copies.
 
-Operators use `with-cred -- scripts/deploy.sh` to build, migrate, apply
-Terraform, and print outputs. `with-cred -- scripts/smoke.sh` checks the live
-Ahara path after deploy. The Terraform plan path is:
+Operators use the secret broker for deploy and live smoke commands:
 
 ```bash
-with-cred -- terraform -chdir=infrastructure/terraform plan -refresh=false -input=false -out=/tmp/linkdrop-m8.tfplan
+with-cred -- scripts/deploy.sh
+with-cred -- scripts/smoke.sh
 ```

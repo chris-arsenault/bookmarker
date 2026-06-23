@@ -10,10 +10,11 @@ db/migrations/rollback/001_create_tables.sql
 db/migrations/seed/001_initial_data.sql
 ```
 
-`001_create_linkdrop_model.sql` defines the M1 durable model for captured
-links, original and canonical URLs, explicit tags, tag usage counts, notes,
-metadata snapshots, processing jobs, and archive status. Rollback files must
-drop only project-owned objects in reverse dependency order.
+The migration set defines the durable model for captured URLs, text snippets,
+images, original and canonical URLs, explicit tags, tag usage counts, notes,
+metadata snapshots, processing jobs, upload status, update polling, and archive
+status. Rollback files must drop only project-owned objects in reverse
+dependency order.
 
 The Rust integration tests under `backend/shared/tests/` apply this migration
 against PostgreSQL, verify constraints and idempotent status updates, and apply

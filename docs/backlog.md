@@ -7,7 +7,6 @@ Planned-but-not-built work. Each item is a positive assertion of future-state be
 - Add browser extension capture for desktop workflows.
 - Add Android offline queueing with retry once connectivity returns.
 - Add bulk import from exported bookmark and watch-later files.
-- Add a Gradle/JDK Android compile gate once the platform build standard exists.
 
 ## Enrichment
 

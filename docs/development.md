@@ -33,8 +33,8 @@ Linkdrop follows the Ahara project standards:
 `make ci` checks Rust lint/unit tests/API route tests, frontend
 lint/typecheck/tests, Electron desktop typecheck, documentation scaffold,
 Terraform formatting, Android share target structure, and Android
-`:app:assembleDebug`. It does not run the Docker-backed PostgreSQL integration
-suite; use `make db-test` before database migration, PostgreSQL repository, or
+`:app:assembleDebug`. Run `make db-test` for the Docker-backed PostgreSQL
+integration suite before database migration, PostgreSQL repository, or
 processing queue changes. `make ci` enforces Rust Clippy warnings, Rust
 cognitive complexity `10`, Rust function length `75`, Rust source files under
 `400` lines, TypeScript/React cognitive complexity `10`, TypeScript files under
@@ -43,8 +43,8 @@ checked-in Gradle wrapper and require `ANDROID_HOME` or `ANDROID_SDK_ROOT` to
 point at an SDK with platform `android-36`; `$HOME/android-sdk` is used when
 neither variable is set. Android APK outputs are named for the product and
 variant, such as `linkdrop-debug-v0.1.0-1.apk` and
-`linkdrop-release-unsigned-v0.1.0-1.apk`. The release APK is unsigned until a
-real release signing config is provided.
+`linkdrop-release-unsigned-v0.1.0-1.apk`. Release signing uses
+`make android-create-release-keystore` and `make android-sign-release`.
 
 ## Deploy and smoke
 

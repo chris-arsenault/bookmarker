@@ -32,13 +32,13 @@ to an SDK that has platform `android-36`, or install the SDK under
 
 APK outputs use product-specific names:
 
-| Variant | Path |
-| ---- | ---- |
-| Debug | `android/app/build/outputs/apk/debug/linkdrop-debug-v0.1.0-1.apk` |
+| Variant | Path                                                                           |
+| ------- | ------------------------------------------------------------------------------ |
+| Debug   | `android/app/build/outputs/apk/debug/linkdrop-debug-v0.1.0-1.apk`              |
 | Release | `android/app/build/outputs/apk/release/linkdrop-release-unsigned-v0.1.0-1.apk` |
 
-Run `make android-release-build` for the release variant. The current release
-artifact is unsigned because no Linkdrop release keystore is configured.
+Run `make android-release-build` for the unsigned release variant. Release
+signing is handled by the guarded signing script.
 
 Use the guarded scripts for signing and device installs:
 
