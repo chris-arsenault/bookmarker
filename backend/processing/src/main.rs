@@ -1,4 +1,4 @@
-use ahara_lambda_telemetry::{Operation, TelemetryConfig};
+use ahara_lambda_telemetry::{Operation, OperationKind, TelemetryConfig};
 use aws_config::BehaviorVersion;
 use lambda_runtime::{service_fn, Error, LambdaEvent};
 use processing::extractors::{OpenGraphExtractor, ReqwestMetadataFetch};
@@ -34,6 +34,8 @@ async fn handler(event: LambdaEvent<ProcessEvent>) -> Result<(), Error> {
         "processing.process_item",
     )
     .with_domain("processing")
+    .with_kind(OperationKind::Background)
+    .with_detail("item.id", item_id.to_string())
     .observe(async {
         runtime_pipeline()
             .await?

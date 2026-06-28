@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 mod http;
 pub mod image_access;
+mod item_operation_details;
 mod item_query;
 mod item_routes;
 pub mod processing_dispatch;
 mod tag_routes;
 pub mod thumbnail_access;
 
-use ahara_lambda_telemetry::{Operation, TelemetryConfig};
+use ahara_lambda_telemetry::{Operation, OperationKind, TelemetryConfig};
 use lambda_http::{Body, Request, Response};
 use serde_json::json;
 use shared::auth::{AlbValidatedJwtVerifier, AuthVerifier, UserContext};
@@ -117,8 +118,8 @@ fn health() -> ApiResult<ApiResponse> {
 }
 
 async fn me(state: &ApiState, headers: &HeaderMap) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.me", async {
-        let user = require_user(state, headers).await?;
+    let user = require_user(state, headers).await?;
+    observe_api_operation(user_api_operation("api.me", &user), async {
         json_response(StatusCode::OK, &user).map_err(Into::into)
     })
     .await
@@ -139,17 +140,24 @@ pub(crate) async fn require_user(
 }
 
 pub(crate) async fn observe_api_operation<T, E, Fut>(
-    name: &'static str,
+    operation: Operation,
     future: Fut,
 ) -> Result<T, E>
 where
     E: std::fmt::Debug,
     Fut: std::future::Future<Output = Result<T, E>>,
 {
-    Operation::new(TelemetryConfig::new("linkdrop-api"), name)
-        .with_domain("api")
-        .observe(future)
-        .await
+    operation.observe(future).await
+}
+
+pub(crate) fn api_operation(name: &'static str) -> Operation {
+    Operation::new(TelemetryConfig::new("linkdrop-api"), name).with_domain("api")
+}
+
+pub(crate) fn user_api_operation(name: &'static str, user: &UserContext) -> Operation {
+    api_operation(name)
+        .with_kind(OperationKind::UserInteraction)
+        .with_detail("enduser.id", user.sub.clone())
 }
 
 #[derive(Debug, Clone)]

@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "ahara-lambda-telemetry"
 version = "0.1.0"
-source = "git+https://github.com/chris-arsenault/ahara-infra.git#7f221e6f3fe33d20f2a95db8e546c2db9ddc0ded"
+source = "git+https://github.com/chris-arsenault/ahara-infra.git#7e7b31a6a9dbc3e8ffb2eb5ab8af33f8107855ae"
 dependencies = [
  "bytes",
  "lambda_http",
@@ -1105,7 +1105,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1699,7 +1699,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.4",
  "tokio",
  "tower-service",
  "tracing",
@@ -2499,7 +2499,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls 0.23.40",
- "socket2 0.5.10",
+ "socket2 0.6.4",
  "thiserror",
  "tokio",
  "tracing",
@@ -2536,7 +2536,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.4",
  "tracing",
  "windows-sys 0.52.0",
 ]

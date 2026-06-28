@@ -7,6 +7,11 @@ use shared::library::{
 };
 use uuid::Uuid;
 
+use crate::item_operation_details::{
+    capture_image_upload_operation, capture_text_operation, capture_url_operation,
+    complete_image_upload_operation, dispatch_item_operation, item_operation,
+    list_item_updates_operation, list_items_operation, update_item_operation,
+};
 use crate::item_query::{ListItemUpdatesParams, ListItemsParams};
 use crate::{observe_api_operation, require_user, ApiResponse, ApiResult, ApiState};
 
@@ -121,12 +126,10 @@ async fn item_route(
 }
 
 async fn capture_image_upload(state: &ApiState, request: &Request) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.items.capture_image_upload", async {
-        let user = require_user(state, request.headers()).await?;
-        let outcome = state
-            .library
-            .capture_image_upload(&user, json_body::<CaptureImageUploadRequest>(request)?)
-            .await?;
+    let user = require_user(state, request.headers()).await?;
+    let capture = json_body::<CaptureImageUploadRequest>(request)?;
+    observe_api_operation(capture_image_upload_operation(&user, &capture), async {
+        let outcome = state.library.capture_image_upload(&user, capture).await?;
         let image = outcome
             .item
             .summary
@@ -155,36 +158,36 @@ async fn complete_image_upload(
     request: &Request,
     item_id: Uuid,
 ) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.items.complete_image_upload", async {
-        let user = require_user(state, request.headers()).await?;
-        json_response(
-            StatusCode::OK,
-            &state.library.complete_image_upload(&user, item_id).await?,
-        )
-        .map_err(Into::into)
-    })
+    let user = require_user(state, request.headers()).await?;
+    let existing = state.library.get_item(&user, item_id).await?;
+    observe_api_operation(
+        complete_image_upload_operation(&user, item_id, existing.summary.image.as_ref()),
+        async {
+            json_response(
+                StatusCode::OK,
+                &state.library.complete_image_upload(&user, item_id).await?,
+            )
+            .map_err(Into::into)
+        },
+    )
     .await
 }
 
 async fn capture_text(state: &ApiState, request: &Request) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.items.capture_text", async {
-        let user = require_user(state, request.headers()).await?;
-        let outcome = state
-            .library
-            .capture_text(&user, json_body::<CaptureTextRequest>(request)?)
-            .await?;
+    let user = require_user(state, request.headers()).await?;
+    let capture = json_body::<CaptureTextRequest>(request)?;
+    observe_api_operation(capture_text_operation(&user, &capture), async {
+        let outcome = state.library.capture_text(&user, capture).await?;
         capture_outcome_response(outcome)
     })
     .await
 }
 
 async fn capture_item(state: &ApiState, request: &Request) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.items.capture_url", async {
-        let user = require_user(state, request.headers()).await?;
-        let outcome = state
-            .library
-            .capture_item(&user, json_body::<CaptureItemRequest>(request)?)
-            .await?;
+    let user = require_user(state, request.headers()).await?;
+    let capture = json_body::<CaptureItemRequest>(request)?;
+    observe_api_operation(capture_url_operation(&user, &capture), async {
+        let outcome = state.library.capture_item(&user, capture).await?;
         dispatch_processing(state, outcome.item.summary.id).await;
         capture_outcome_response(outcome)
     })
@@ -192,7 +195,7 @@ async fn capture_item(state: &ApiState, request: &Request) -> ApiResult<ApiRespo
 }
 
 async fn dispatch_processing(state: &ApiState, item_id: Uuid) {
-    let result = observe_api_operation("api.processing.dispatch_item", async {
+    let result = observe_api_operation(dispatch_item_operation(item_id), async {
         state.processing_dispatcher.dispatch_item(item_id).await
     })
     .await;
@@ -206,15 +209,12 @@ async fn dispatch_processing(state: &ApiState, item_id: Uuid) {
 }
 
 async fn list_items(state: &ApiState, request: &Request) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.items.list", async {
-        let user = require_user(state, request.headers()).await?;
-        let params = query_params::<ListItemsParams>(request)?;
+    let user = require_user(state, request.headers()).await?;
+    let query = query_params::<ListItemsParams>(request)?.into_query()?;
+    observe_api_operation(list_items_operation(&user, &query), async {
         json_response(
             StatusCode::OK,
-            &state
-                .library
-                .list_items(&user, &params.into_query()?)
-                .await?,
+            &state.library.list_items(&user, &query).await?,
         )
         .map_err(Into::into)
     })
@@ -222,15 +222,12 @@ async fn list_items(state: &ApiState, request: &Request) -> ApiResult<ApiRespons
 }
 
 async fn list_item_updates(state: &ApiState, request: &Request) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.items.list_updates", async {
-        let user = require_user(state, request.headers()).await?;
-        let params = query_params::<ListItemUpdatesParams>(request)?;
+    let user = require_user(state, request.headers()).await?;
+    let query = query_params::<ListItemUpdatesParams>(request)?.into_query()?;
+    observe_api_operation(list_item_updates_operation(&user, &query), async {
         json_response(
             StatusCode::OK,
-            &state
-                .library
-                .list_item_updates(&user, &params.into_query()?)
-                .await?,
+            &state.library.list_item_updates(&user, &query).await?,
         )
         .map_err(Into::into)
     })
@@ -238,8 +235,8 @@ async fn list_item_updates(state: &ApiState, request: &Request) -> ApiResult<Api
 }
 
 async fn get_item(state: &ApiState, request: &Request, item_id: Uuid) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.items.get", async {
-        let user = require_user(state, request.headers()).await?;
+    let user = require_user(state, request.headers()).await?;
+    observe_api_operation(item_operation("api.items.get", &user, item_id), async {
         json_response(
             StatusCode::OK,
             &state.library.get_item(&user, item_id).await?,
@@ -254,8 +251,10 @@ async fn get_item_thumbnail(
     request: &Request,
     item_id: Uuid,
 ) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.items.get_thumbnail", async {
-        let user = require_user(state, request.headers()).await?;
+    let user = require_user(state, request.headers()).await?;
+    let operation = item_operation("api.items.get_thumbnail", &user, item_id)
+        .with_detail("asset.kind", "thumbnail");
+    observe_api_operation(operation, async {
         let item = state.library.get_item(&user, item_id).await?;
         let key = item.summary.thumbnail_s3_key.ok_or_else(|| {
             shared::error::AppError::NotFound(format!("thumbnail for item {item_id}"))
@@ -273,8 +272,10 @@ async fn get_item_image(
     request: &Request,
     item_id: Uuid,
 ) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.items.get_image", async {
-        let user = require_user(state, request.headers()).await?;
+    let user = require_user(state, request.headers()).await?;
+    let operation =
+        item_operation("api.items.get_image", &user, item_id).with_detail("asset.kind", "image");
+    observe_api_operation(operation, async {
         let item = state.library.get_item(&user, item_id).await?;
         let image = item.summary.image.as_ref().ok_or_else(|| {
             shared::error::AppError::NotFound(format!("image for item {item_id}"))
@@ -313,12 +314,12 @@ fn image_download_name(summary: &LibraryItemSummary) -> String {
 }
 
 async fn update_item(state: &ApiState, request: &Request, item_id: Uuid) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.items.update", async {
-        let update = json_body::<UpdateItemRequest>(request)?;
-        if empty_update_request(&update) {
-            return Err(validation_error("item update must include at least one field").into());
-        }
-        let user = require_user(state, request.headers()).await?;
+    let update = json_body::<UpdateItemRequest>(request)?;
+    if empty_update_request(&update) {
+        return Err(validation_error("item update must include at least one field").into());
+    }
+    let user = require_user(state, request.headers()).await?;
+    observe_api_operation(update_item_operation(&user, item_id, &update), async {
         json_response(
             StatusCode::OK,
             &state.library.update_item(&user, item_id, update).await?,
@@ -329,8 +330,8 @@ async fn update_item(state: &ApiState, request: &Request, item_id: Uuid) -> ApiR
 }
 
 async fn delete_item(state: &ApiState, request: &Request, item_id: Uuid) -> ApiResult<ApiResponse> {
-    observe_api_operation("api.items.delete", async {
-        let user = require_user(state, request.headers()).await?;
+    let user = require_user(state, request.headers()).await?;
+    observe_api_operation(item_operation("api.items.delete", &user, item_id), async {
         state.library.delete_item(&user, item_id).await?;
         Ok(no_content_response())
     })
