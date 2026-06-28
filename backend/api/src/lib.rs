@@ -1,19 +1,16 @@
 use std::sync::Arc;
 
-mod cors;
+mod http;
 pub mod image_access;
+mod item_query;
 mod item_routes;
 pub mod processing_dispatch;
 mod tag_routes;
 pub mod thumbnail_access;
 
-use axum::extract::State;
-use axum::http::{header, HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Response};
-use axum::routing::get;
-use axum::{Json, Router};
-use cors::cors_layer;
-use serde_json::{json, Value};
+use ahara_lambda_telemetry::{Operation, TelemetryConfig};
+use lambda_http::{Body, Request, Response};
+use serde_json::json;
 use shared::auth::{AlbValidatedJwtVerifier, AuthVerifier, UserContext};
 use shared::config::AppConfig;
 use shared::db::{connect_pool, DbPool};
@@ -21,9 +18,18 @@ use shared::error::{AppError, AppResult};
 use shared::library::LibraryService;
 use shared::library_pg::PgLibraryService;
 
+use http::prelude::*;
+use http::{default_cors, error_response, HttpError, PublicHttpError};
 use image_access::{ImageObjectStore, S3ImageObjectStore};
 use processing_dispatch::{LambdaProcessingDispatcher, ProcessingDispatcher};
 use thumbnail_access::{S3ThumbnailReader, ThumbnailReader};
+
+pub type ApiResponse = Response<Body>;
+pub type ApiResult<T> = Result<T, ApiError>;
+
+pub fn http_body_bytes(body: &Body) -> &[u8] {
+    http::body_bytes(body)
+}
 
 #[derive(Clone)]
 pub struct ApiState {
@@ -76,28 +82,46 @@ impl ApiState {
     }
 }
 
-pub fn router(state: ApiState) -> Router {
-    Router::new()
-        .route("/health", get(health))
-        .route("/me", get(me))
-        .merge(item_routes::router())
-        .merge(tag_routes::router())
-        .layer(cors_layer())
-        .with_state(state)
+pub async fn handle_request(request: Request, state: Arc<ApiState>) -> ApiResponse {
+    let response = dispatch_request(&request, &state)
+        .await
+        .unwrap_or_else(|err| error_response(&err));
+    default_cors(response)
 }
 
-async fn health() -> Json<Value> {
-    Json(json!({
+async fn dispatch_request(request: &Request, state: &ApiState) -> ApiResult<ApiResponse> {
+    let route = Route::from_request(request);
+    if route.is_match(Method::GET, "/health")? {
+        return health();
+    }
+    if route.is_match(Method::GET, "/me")? {
+        return me(state, request.headers()).await;
+    }
+    if let Some(response) = item_routes::dispatch(&route, request, state).await? {
+        return Ok(response);
+    }
+    if let Some(response) = tag_routes::dispatch(&route, request, state).await? {
+        return Ok(response);
+    }
+    Err(HttpError::not_found().into())
+}
+
+fn health() -> ApiResult<ApiResponse> {
+    Ok(json_value_response(
+        StatusCode::OK,
+        json!({
         "status": "ok",
         "service": shared::service_name(),
-    }))
+        }),
+    ))
 }
 
-async fn me(
-    State(state): State<ApiState>,
-    headers: HeaderMap,
-) -> Result<Json<UserContext>, ApiError> {
-    Ok(Json(require_user(&state, &headers).await?))
+async fn me(state: &ApiState, headers: &HeaderMap) -> ApiResult<ApiResponse> {
+    observe_api_operation("api.me", async {
+        let user = require_user(state, headers).await?;
+        json_response(StatusCode::OK, &user).map_err(Into::into)
+    })
+    .await
 }
 
 pub(crate) async fn require_user(
@@ -114,26 +138,59 @@ pub(crate) async fn require_user(
         .await
 }
 
-pub struct ApiError(AppError);
+pub(crate) async fn observe_api_operation<T, E, Fut>(
+    name: &'static str,
+    future: Fut,
+) -> Result<T, E>
+where
+    E: std::fmt::Debug,
+    Fut: std::future::Future<Output = Result<T, E>>,
+{
+    Operation::new(TelemetryConfig::new("linkdrop-api"), name)
+        .with_domain("api")
+        .observe(future)
+        .await
+}
+
+#[derive(Debug, Clone)]
+pub struct ApiError {
+    status_code: StatusCode,
+    code: String,
+    message: String,
+}
 
 impl From<AppError> for ApiError {
     fn from(value: AppError) -> Self {
-        Self(value)
+        let public = value.public_error();
+        Self {
+            status_code: StatusCode::from_u16(public.status_code)
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            code: public.code.to_string(),
+            message: public.message,
+        }
     }
 }
 
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        let public = self.0.public_error();
-        let status =
-            StatusCode::from_u16(public.status_code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-        (
-            status,
-            Json(json!({
-                "code": public.code,
-                "message": public.message,
-            })),
-        )
-            .into_response()
+impl From<HttpError> for ApiError {
+    fn from(value: HttpError) -> Self {
+        Self {
+            status_code: value.status_code(),
+            code: value.code().into_owned(),
+            message: value.message().into_owned(),
+        }
+    }
+}
+
+impl PublicHttpError for ApiError {
+    fn status_code(&self) -> StatusCode {
+        self.status_code
+    }
+
+    fn code(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Borrowed(&self.code)
+    }
+
+    fn message(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Borrowed(&self.message)
     }
 }

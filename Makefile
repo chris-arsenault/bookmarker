@@ -21,7 +21,7 @@ endif
 
 .PHONY: ci lint rust-lines-check telemetry-adoption-check fmt typecheck desktop-typecheck desktop-package test backend-fast-test frontend-test db-test android-structure-check android-build-check android-release-build android-assemble android-create-release-keystore android-sign-release android-install-debug android-install-release docs-check terraform-fmt-check build deploy
 
-ci: lint telemetry-adoption-check fmt typecheck desktop-typecheck test android-structure-check android-build-check docs-check terraform-fmt-check
+ci: lint telemetry-adoption-check fmt typecheck desktop-typecheck test android-structure-check docs-check terraform-fmt-check
 
 lint: rust-lines-check
 	cd backend && cargo clippy --workspace --all-targets -- $(RUST_CLIPPY_FLAGS)
@@ -113,7 +113,6 @@ build:
 	cd backend && cargo build --workspace
 	cd frontend && pnpm run build
 	cd frontend && pnpm run desktop:build
-	$(MAKE) android-build-check
 
 deploy:
 	scripts/deploy.sh

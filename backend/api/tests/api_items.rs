@@ -2,8 +2,8 @@ mod support;
 
 use std::sync::Arc;
 
-use axum::body::Body;
-use axum::http::{Method, StatusCode};
+use lambda_http::http::{Method, StatusCode};
+use lambda_http::Body;
 use shared::domain::{ArchiveStatus, InboxStatus, ItemKind, WatchStatus};
 use shared::library::{
     InMemoryLibraryService, ItemTag, ItemUrlSummary, LibraryItemDetail, LibraryItemSummary,
@@ -22,7 +22,7 @@ async fn items_route_requires_auth() {
         Method::GET,
         "/items",
         None,
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -39,7 +39,7 @@ async fn items_route_returns_empty_library() {
         Method::GET,
         "/items",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -58,7 +58,7 @@ async fn items_route_returns_seeded_item_detail() {
         Method::GET,
         &format!("/items/{item_id}"),
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -79,7 +79,7 @@ async fn items_route_returns_seeded_item_list() {
         Method::GET,
         "/items",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -99,7 +99,7 @@ async fn item_updates_route_returns_changed_items_as_a_batch() {
         Method::GET,
         "/items/updates?since=1969-12-31T00%3A00%3A00Z&limit=10",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -120,7 +120,7 @@ async fn item_updates_route_without_since_returns_cursor_only() {
         Method::GET,
         "/items/updates",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -139,7 +139,7 @@ async fn item_updates_route_keeps_cursor_on_limited_batches() {
         Method::GET,
         "/items/updates?since=1969-12-31T00%3A00%3A00Z&limit=1",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -158,7 +158,7 @@ async fn items_route_applies_library_filters() {
         Method::GET,
         "/items?platform=youtube&tag=learning&created_from=1969-12-31T00%3A00%3A00Z&created_to=1970-01-02T00%3A00%3A00Z&archive_status=succeeded&watch_status=unwatched&q=pipeline",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -176,7 +176,7 @@ async fn items_route_filters_by_inbox_status() {
         Method::GET,
         "/items?inbox_status=organized",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -195,7 +195,7 @@ async fn items_route_returns_not_found_shape_for_missing_item() {
         Method::GET,
         &format!("/items/{}", item_id()),
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 

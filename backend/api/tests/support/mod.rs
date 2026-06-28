@@ -1,21 +1,21 @@
 use std::sync::Arc;
 
 use api::image_access::{ImageObjectStore, InMemoryImageObjectStore};
-use api::thumbnail_access::InMemoryThumbnailReader;
-use api::{router, ApiState, ApiStateServices};
+use api::thumbnail_access::{InMemoryThumbnailReader, ThumbnailReader};
+use api::{handle_request, ApiState, ApiStateServices};
 use async_trait::async_trait;
-use axum::body::{to_bytes, Body};
-use axum::http::{Method, Request, Response};
-use axum::Router;
 use base64::Engine;
+use lambda_http::http::Method;
+use lambda_http::{Body, Response};
 use serde_json::{json, Value};
 use shared::auth::{decode_unverified_claims, AuthVerifier, UserContext};
 use shared::config::{ApiConfig, AppConfig, CognitoConfig, DatabaseConfig};
 use shared::db::database_url;
 use shared::error::AppResult;
 use shared::library::{InMemoryLibraryService, LibraryService};
-use tower::ServiceExt;
 use uuid::Uuid;
+
+pub type TestApp = Arc<ApiState>;
 
 struct TestAuthVerifier;
 
@@ -29,7 +29,8 @@ impl AuthVerifier for TestAuthVerifier {
     }
 }
 
-pub fn test_app(library: Arc<dyn LibraryService>) -> Router {
+#[allow(dead_code)]
+pub fn test_app(library: Arc<dyn LibraryService>) -> TestApp {
     test_app_with_processing_dispatcher(library, Arc::new(NoopProcessingDispatcher))
 }
 
@@ -37,17 +38,37 @@ pub fn test_app(library: Arc<dyn LibraryService>) -> Router {
 pub fn test_app_with_image_store(
     library: Arc<dyn LibraryService>,
     image_store: Arc<dyn ImageObjectStore>,
-) -> Router {
-    test_app_with_state_parts(library, Arc::new(NoopProcessingDispatcher), image_store)
+) -> TestApp {
+    test_app_with_state_parts(
+        library,
+        Arc::new(NoopProcessingDispatcher),
+        Arc::new(InMemoryThumbnailReader::default()),
+        image_store,
+    )
 }
 
+#[allow(dead_code)]
+pub fn test_app_with_thumbnail_reader(
+    library: Arc<dyn LibraryService>,
+    thumbnail_reader: Arc<dyn ThumbnailReader>,
+) -> TestApp {
+    test_app_with_state_parts(
+        library,
+        Arc::new(NoopProcessingDispatcher),
+        thumbnail_reader,
+        Arc::new(InMemoryImageObjectStore),
+    )
+}
+
+#[allow(dead_code)]
 pub fn test_app_with_processing_dispatcher(
     library: Arc<dyn LibraryService>,
     processing_dispatcher: Arc<dyn api::processing_dispatch::ProcessingDispatcher>,
-) -> Router {
+) -> TestApp {
     test_app_with_state_parts(
         library,
         processing_dispatcher,
+        Arc::new(InMemoryThumbnailReader::default()),
         Arc::new(InMemoryImageObjectStore),
     )
 }
@@ -55,25 +76,27 @@ pub fn test_app_with_processing_dispatcher(
 fn test_app_with_state_parts(
     library: Arc<dyn LibraryService>,
     processing_dispatcher: Arc<dyn api::processing_dispatch::ProcessingDispatcher>,
+    thumbnail_reader: Arc<dyn ThumbnailReader>,
     image_store: Arc<dyn ImageObjectStore>,
-) -> Router {
+) -> TestApp {
     let config = test_config();
     let db = sqlx::postgres::PgPoolOptions::new()
         .connect_lazy(&database_url(&config.database))
         .unwrap();
-    router(ApiState::new(
+    Arc::new(ApiState::new(
         config,
         db,
         ApiStateServices {
             auth: Arc::new(TestAuthVerifier),
             library,
             processing_dispatcher,
-            thumbnail_reader: Arc::new(InMemoryThumbnailReader::default()),
+            thumbnail_reader,
             image_store,
         },
     ))
 }
 
+#[allow(dead_code)]
 pub fn empty_library() -> Arc<dyn LibraryService> {
     Arc::new(InMemoryLibraryService::new())
 }
@@ -90,23 +113,25 @@ pub fn bearer_token(sub: &str) -> String {
 }
 
 pub async fn request(
-    app: Router,
+    app: TestApp,
     method: Method,
     uri: &str,
     auth: Option<&str>,
     body: Body,
 ) -> Response<Body> {
-    let mut builder = Request::builder().method(method).uri(uri);
+    let mut builder = lambda_http::http::Request::builder()
+        .method(method)
+        .uri(uri);
     if let Some(auth) = auth {
         builder = builder.header("authorization", auth);
     }
     builder = builder.header("content-type", "application/json");
-    app.oneshot(builder.body(body).unwrap()).await.unwrap()
+    handle_request(builder.body(body).unwrap(), app).await
 }
 
+#[allow(dead_code)]
 pub async fn response_json(response: Response<Body>) -> Value {
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice(&body).unwrap()
+    serde_json::from_slice(api::http_body_bytes(response.body())).unwrap()
 }
 
 #[allow(dead_code)]

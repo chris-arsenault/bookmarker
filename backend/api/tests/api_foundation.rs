@@ -1,7 +1,7 @@
 mod support;
 
-use axum::body::Body;
-use axum::http::{Method, StatusCode};
+use lambda_http::http::{Method, StatusCode};
+use lambda_http::Body;
 
 use support::{
     assert_token_decodes, bearer_token, empty_library, request, response_json, test_app,
@@ -14,7 +14,7 @@ async fn health_route_returns_service_status_without_auth() {
         Method::GET,
         "/health",
         None,
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -34,7 +34,7 @@ async fn me_route_returns_authenticated_user_context() {
         Method::GET,
         "/me",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -52,7 +52,7 @@ async fn me_route_rejects_missing_auth_metadata() {
         Method::GET,
         "/me",
         None,
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -68,7 +68,7 @@ async fn api_success_responses_include_cors_header_for_browser_origins() {
         Method::GET,
         "/health",
         None,
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 

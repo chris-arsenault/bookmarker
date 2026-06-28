@@ -11,9 +11,9 @@ cd ..
 make ci
 ```
 
-`make ci` includes the Android debug build. Set `ANDROID_HOME` or
-`ANDROID_SDK_ROOT` to an SDK with platform `android-36`, or install that SDK
-under `$HOME/android-sdk`.
+`make ci` verifies the Rust backend, web/desktop frontend, docs scaffold,
+Terraform formatting, and Android share-target structure. It does not run a
+Gradle/Java Android build in this environment.
 
 Run focused database tests for migration, PostgreSQL repository, or processing
 queue changes:

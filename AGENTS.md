@@ -47,7 +47,7 @@ Bookmarker is an Ahara-integrated personal capture vault with a Rust API, React 
 | -------------- | ------------------------------------------------------------------------------------------------ |
 | `make ci`      | Run the canonical local verification target for the current repo state                           |
 | `make db-test` | Run Docker-backed PostgreSQL migration, repository, and processing integration tests             |
-| `make build`   | Build the registered Rust workspace, frontend shell, Electron entrypoints, and Android debug APK |
+| `make build`   | Build the registered Rust workspace, frontend shell, and Electron entrypoints                    |
 | `make deploy`  | Run the parameterless local deploy script                                                        |
 
 `make ci` enforces Rust Clippy warnings, Rust cognitive complexity `10`, Rust function length `75`, Rust source files under `400` lines, TypeScript/React cognitive complexity `10`, TypeScript files under `400` lines, and TypeScript functions under `75` lines. It intentionally excludes the Docker-backed PostgreSQL integration suite; run `make db-test` for migration, PostgreSQL repository, or processing queue changes.

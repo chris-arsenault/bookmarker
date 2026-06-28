@@ -18,7 +18,7 @@ Linkdrop follows the Ahara project standards:
 | ----------------------------------------------- | ---------------------------------------------------------------------------------- |
 | `make ci`                                       | Canonical local verification target                                                |
 | `make db-test`                                  | Docker-backed PostgreSQL migration/repository/processing integration tests         |
-| `make build`                                    | Build the registered Rust workspace, frontend shell, and Android debug APK         |
+| `make build`                                    | Build the registered Rust workspace, frontend shell, and Electron entrypoints      |
 | `cd frontend && pnpm run desktop:build`         | Build the Electron desktop main/preload entrypoints                                |
 | `cd frontend && pnpm run desktop:start`         | Build frontend + Electron entrypoints and start the desktop shell                  |
 | `make desktop-package`                          | Build a runnable current-platform Electron shell under `frontend/release/`         |
@@ -32,19 +32,20 @@ Linkdrop follows the Ahara project standards:
 
 `make ci` checks Rust lint/unit tests/API route tests, frontend
 lint/typecheck/tests, Electron desktop typecheck, documentation scaffold,
-Terraform formatting, Android share target structure, and Android
-`:app:assembleDebug`. Run `make db-test` for the Docker-backed PostgreSQL
-integration suite before database migration, PostgreSQL repository, or
-processing queue changes. `make ci` enforces Rust Clippy warnings, Rust
-cognitive complexity `10`, Rust function length `75`, Rust source files under
-`400` lines, TypeScript/React cognitive complexity `10`, TypeScript files under
-`400` lines, and TypeScript functions under `75` lines. Android builds use the
-checked-in Gradle wrapper and require `ANDROID_HOME` or `ANDROID_SDK_ROOT` to
-point at an SDK with platform `android-36`; `$HOME/android-sdk` is used when
-neither variable is set. Android APK outputs are named for the product and
-variant, such as `linkdrop-debug-v0.1.0-1.apk` and
-`linkdrop-release-unsigned-v0.1.0-1.apk`. Release signing uses
-`make android-create-release-keystore` and `make android-sign-release`.
+Terraform formatting, and Android share target structure. It does not run a
+Gradle/Java Android build in this environment. Run `make db-test` for the
+Docker-backed PostgreSQL integration suite before database migration,
+PostgreSQL repository, or processing queue changes. `make ci` enforces Rust
+Clippy warnings, Rust cognitive complexity `10`, Rust function length `75`,
+Rust source files under `400` lines, TypeScript/React cognitive complexity
+`10`, TypeScript files under `400` lines, and TypeScript functions under `75`
+lines. Explicit Android build targets use the checked-in Gradle wrapper and
+require `ANDROID_HOME` or `ANDROID_SDK_ROOT` to point at an SDK with platform
+`android-36`; `$HOME/android-sdk` is used when neither variable is set. Android
+APK outputs are named for the product and variant, such as
+`linkdrop-debug-v0.1.0-1.apk` and `linkdrop-release-unsigned-v0.1.0-1.apk`.
+Release signing uses `make android-create-release-keystore` and
+`make android-sign-release`.
 
 ## Deploy and smoke
 

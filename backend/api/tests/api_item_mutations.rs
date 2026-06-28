@@ -2,8 +2,8 @@ mod support;
 
 use std::sync::Arc;
 
-use axum::body::Body;
-use axum::http::{Method, StatusCode};
+use lambda_http::http::{Method, StatusCode};
+use lambda_http::Body;
 use shared::domain::{ArchiveStatus, InboxStatus, ItemKind, WatchStatus};
 use shared::library::{
     InMemoryLibraryService, ItemTag, ItemUrlSummary, LibraryItemDetail, LibraryItemSummary,
@@ -38,7 +38,7 @@ async fn delete_item_route_requires_auth() {
         Method::DELETE,
         &format!("/items/{}", item_id()),
         None,
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -144,7 +144,7 @@ async fn delete_item_route_removes_item() {
         Method::DELETE,
         &format!("/items/{item_id}"),
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -155,7 +155,7 @@ async fn delete_item_route_removes_item() {
         Method::GET,
         &format!("/items/{item_id}"),
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 

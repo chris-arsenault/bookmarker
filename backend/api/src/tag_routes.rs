@@ -1,50 +1,73 @@
-use axum::extract::{Path, State};
-use axum::http::HeaderMap;
-use axum::routing::{get, patch, post};
-use axum::{Json, Router};
-use shared::library::{MergeTagsRequest, RenameTagRequest, TagCorpusEntry};
+use crate::http::prelude::*;
+use shared::library::{MergeTagsRequest, RenameTagRequest};
 use uuid::Uuid;
 
-use crate::{require_user, ApiError, ApiState};
+use crate::{observe_api_operation, require_user, ApiResponse, ApiResult, ApiState};
 
-pub fn router() -> Router<ApiState> {
-    Router::new()
-        .route("/tags", get(list_tags))
-        .route("/tags/{tag_id}", patch(rename_tag))
-        .route("/tags/{source_tag_id}/merge", post(merge_tags))
+pub async fn dispatch(
+    route: &Route<'_>,
+    request: &Request,
+    state: &ApiState,
+) -> ApiResult<Option<ApiResponse>> {
+    if route.is_match(Method::GET, "/tags")? {
+        return list_tags(state, request).await.map(Some);
+    }
+    if let Some(params) = route.matches(Method::PATCH, "/tags/{tag_id}")? {
+        return rename_tag(state, request, params.parse("tag_id")?)
+            .await
+            .map(Some);
+    }
+    if let Some(params) = route.matches(Method::POST, "/tags/{source_tag_id}/merge")? {
+        return merge_tags(state, request, params.parse("source_tag_id")?)
+            .await
+            .map(Some);
+    }
+    Ok(None)
 }
 
-async fn list_tags(
-    State(state): State<ApiState>,
-    headers: HeaderMap,
-) -> Result<Json<Vec<TagCorpusEntry>>, ApiError> {
-    let user = require_user(&state, &headers).await?;
-    Ok(Json(state.library.list_tag_corpus(&user).await?))
+async fn list_tags(state: &ApiState, request: &Request) -> ApiResult<ApiResponse> {
+    observe_api_operation("api.tags.list", async {
+        let user = require_user(state, request.headers()).await?;
+        json_response(StatusCode::OK, &state.library.list_tag_corpus(&user).await?)
+            .map_err(Into::into)
+    })
+    .await
 }
 
-async fn rename_tag(
-    State(state): State<ApiState>,
-    headers: HeaderMap,
-    Path(tag_id): Path<Uuid>,
-    Json(request): Json<RenameTagRequest>,
-) -> Result<Json<Vec<TagCorpusEntry>>, ApiError> {
-    let user = require_user(&state, &headers).await?;
-    Ok(Json(
-        state.library.rename_tag(&user, tag_id, request).await?,
-    ))
+async fn rename_tag(state: &ApiState, request: &Request, tag_id: Uuid) -> ApiResult<ApiResponse> {
+    observe_api_operation("api.tags.rename", async {
+        let user = require_user(state, request.headers()).await?;
+        json_response(
+            StatusCode::OK,
+            &state
+                .library
+                .rename_tag(&user, tag_id, json_body::<RenameTagRequest>(request)?)
+                .await?,
+        )
+        .map_err(Into::into)
+    })
+    .await
 }
 
 async fn merge_tags(
-    State(state): State<ApiState>,
-    headers: HeaderMap,
-    Path(source_tag_id): Path<Uuid>,
-    Json(request): Json<MergeTagsRequest>,
-) -> Result<Json<Vec<TagCorpusEntry>>, ApiError> {
-    let user = require_user(&state, &headers).await?;
-    Ok(Json(
-        state
-            .library
-            .merge_tags(&user, source_tag_id, request)
-            .await?,
-    ))
+    state: &ApiState,
+    request: &Request,
+    source_tag_id: Uuid,
+) -> ApiResult<ApiResponse> {
+    observe_api_operation("api.tags.merge", async {
+        let user = require_user(state, request.headers()).await?;
+        json_response(
+            StatusCode::OK,
+            &state
+                .library
+                .merge_tags(
+                    &user,
+                    source_tag_id,
+                    json_body::<MergeTagsRequest>(request)?,
+                )
+                .await?,
+        )
+        .map_err(Into::into)
+    })
+    .await
 }

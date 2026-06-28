@@ -3,8 +3,8 @@ mod support;
 use std::sync::Arc;
 
 use api::image_access::InMemoryImageObjectStore;
-use axum::body::Body;
-use axum::http::{Method, StatusCode};
+use lambda_http::http::{Method, StatusCode};
+use lambda_http::Body;
 use shared::domain::{ArchiveStatus, ImageUploadStatus, InboxStatus, ItemKind, WatchStatus};
 use shared::library::{
     InMemoryLibraryService, ItemImageSummary, LibraryItemDetail, LibraryItemSummary,
@@ -87,7 +87,7 @@ async fn image_upload_complete_marks_image_uploaded() {
         Method::POST,
         &format!("/items/{item_id}/image-upload/complete"),
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -108,7 +108,7 @@ async fn item_image_route_returns_owned_uploaded_image_access() {
         Method::GET,
         &format!("/items/{item_id}/image"),
         Some(&bearer_token("image-user")),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 

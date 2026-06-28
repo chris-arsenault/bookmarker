@@ -3,8 +3,8 @@ mod support;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use axum::body::Body;
-use axum::http::{Method, StatusCode};
+use lambda_http::http::{Method, StatusCode};
+use lambda_http::Body;
 use shared::error::{AppError, AppResult};
 use shared::library::InMemoryLibraryService;
 use uuid::Uuid;
@@ -86,7 +86,7 @@ async fn capture_route_accepts_url_without_tags_and_lists_item() {
         Method::GET,
         "/items",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -136,7 +136,7 @@ async fn text_capture_route_accepts_snippet_and_lists_item() {
         Method::GET,
         "/items?q=copy",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
     let payload = response_json(response).await;
@@ -191,7 +191,7 @@ async fn capture_route_applies_explicit_tags() {
         Method::GET,
         "/tags",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -237,7 +237,7 @@ async fn capture_route_reuses_client_capture_id() {
         Method::GET,
         "/items",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
     assert_eq!(response_json(response).await.as_array().unwrap().len(), 1);
@@ -292,7 +292,7 @@ async fn capture_route_returns_existing_item_for_normalized_repeat() {
         Method::GET,
         "/items",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
     assert_eq!(response_json(response).await.as_array().unwrap().len(), 1);

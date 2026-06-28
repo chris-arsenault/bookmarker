@@ -2,8 +2,8 @@ mod support;
 
 use std::sync::Arc;
 
-use axum::body::Body;
-use axum::http::{Method, StatusCode};
+use lambda_http::http::{Method, StatusCode};
+use lambda_http::Body;
 use shared::domain::{ArchiveStatus, InboxStatus, ItemKind, WatchStatus};
 use shared::library::{
     InMemoryLibraryService, ItemTag, ItemUrlSummary, LibraryItemDetail, LibraryItemSummary,
@@ -23,7 +23,7 @@ async fn tags_route_requires_auth() {
         Method::GET,
         "/tags",
         None,
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 
@@ -42,7 +42,7 @@ async fn tags_route_returns_empty_corpus() {
         Method::GET,
         "/tags",
         Some(&auth),
-        Body::empty(),
+        Body::Empty,
     )
     .await;
 

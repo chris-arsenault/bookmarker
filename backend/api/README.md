@@ -3,7 +3,7 @@
 Buildable Rust HTTP API Lambda crate behind the shared Ahara ALB.
 
 The binary entrypoint is thin: it initializes tracing, builds `ApiState` from
-environment configuration, and runs the Axum router through `lambda_http`.
+environment configuration, and runs a direct `lambda_http` request dispatcher.
 Production state uses ALB-validated Cognito bearer tokens, the shared
 PostgreSQL pool, and `PgLibraryService`. Capture also uses
 `ProcessingDispatcher` to enqueue best-effort asynchronous enrichment after the
@@ -34,7 +34,7 @@ All authenticated routes use the shared `AuthVerifier` boundary. The Ahara ALB
 performs JWT validation before forwarding authenticated routes, and the Lambda
 decodes the validated bearer token to get the user context. Public errors are
 returned as `{ "code": "...", "message": "..." }`, and CORS headers are applied
-by the shared API router layer.
+by the API response helper on actual Lambda responses.
 
 `POST /items` accepts:
 
