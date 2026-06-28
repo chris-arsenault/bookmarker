@@ -1,6 +1,7 @@
 package io.ahara.linkdrop.share
 
 import android.content.Context
+import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import io.ahara.linkdrop.api.TagCorpusEntry
@@ -8,6 +9,7 @@ import io.ahara.linkdrop.api.TagCorpusEntry
 class TagChipRow(context: Context) : LinearLayout(context) {
     init {
         orientation = HORIZONTAL
+        gravity = Gravity.CENTER
     }
 
     fun render(

@@ -3,7 +3,9 @@ package io.ahara.linkdrop
 import android.app.Activity
 import android.os.Bundle
 import android.text.InputType
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -22,18 +24,17 @@ class MainActivity : Activity() {
     }
 
     private fun renderHome(message: String = "") {
+        val statusText = if (authClient.hasFreshToken()) {
+            getString(R.string.auth_signed_in)
+        } else {
+            getString(R.string.auth_signed_out)
+        }
         setContentView(
             screen().apply {
                 addView(titleView())
-                addView(TextView(this@MainActivity).apply {
-                    text = if (authClient.hasFreshToken()) {
-                        getString(R.string.auth_signed_in)
-                    } else {
-                        getString(R.string.auth_signed_out)
-                    }
-                })
+                addView(centeredText(statusText))
                 if (message.isNotBlank()) {
-                    addView(TextView(this@MainActivity).apply { text = message })
+                    addView(centeredText(message))
                 }
                 if (authClient.hasFreshToken()) {
                     addView(actionButton(R.string.auth_sign_out) {
@@ -51,11 +52,13 @@ class MainActivity : Activity() {
         val username = EditText(this).apply {
             hint = getString(R.string.auth_username)
             setSingleLine(true)
+            layoutParams = fullWidthLayoutParams(topMargin = 16)
         }
         val password = EditText(this).apply {
             hint = getString(R.string.auth_password)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             setSingleLine(true)
+            layoutParams = fullWidthLayoutParams(topMargin = 12)
         }
         return formLayout().apply {
             addView(username)
@@ -71,16 +74,15 @@ class MainActivity : Activity() {
             hint = getString(R.string.auth_code)
             inputType = InputType.TYPE_CLASS_NUMBER
             setSingleLine(true)
+            layoutParams = fullWidthLayoutParams(topMargin = 16)
         }
         setContentView(
             screen().apply {
                 addView(titleView())
                 if (setup != null) {
-                    addView(TextView(this@MainActivity).apply { text = getString(R.string.auth_setup_prompt) })
-                    addView(TextView(this@MainActivity).apply { text = setup.secretCode })
-                    addView(TextView(this@MainActivity).apply {
-                        text = "${getString(R.string.auth_setup_uri)}\n${setup.otpAuthUri}"
-                    })
+                    addView(centeredText(getString(R.string.auth_setup_prompt)))
+                    addView(centeredText(setup.secretCode))
+                    addView(centeredText("${getString(R.string.auth_setup_uri)}\n${setup.otpAuthUri}"))
                 }
                 addView(code)
                 val action = if (setup == null) {
@@ -116,23 +118,39 @@ class MainActivity : Activity() {
     private fun screen(): LinearLayout =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 32, 32, 32)
+            gravity = Gravity.CENTER
+            setPadding(48, 96, 48, 96)
         }
 
     private fun formLayout(): LinearLayout =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            layoutParams = fullWidthLayoutParams()
         }
 
     private fun titleView(): TextView =
-        TextView(this).apply {
-            text = LinkdropConfig.productName
-            textSize = 24f
-        }
+        centeredText(LinkdropConfig.productName).apply { textSize = 24f }
 
     private fun actionButton(label: Int, onClick: () -> Unit): Button =
         Button(this).apply {
             text = getString(label)
+            layoutParams = fullWidthLayoutParams(topMargin = 16)
             setOnClickListener { onClick() }
+        }
+
+    private fun centeredText(value: String): TextView =
+        TextView(this).apply {
+            text = value
+            gravity = Gravity.CENTER
+            layoutParams = fullWidthLayoutParams(topMargin = 8)
+        }
+
+    private fun fullWidthLayoutParams(topMargin: Int = 0): LinearLayout.LayoutParams =
+        LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply {
+            this.topMargin = topMargin
         }
 }

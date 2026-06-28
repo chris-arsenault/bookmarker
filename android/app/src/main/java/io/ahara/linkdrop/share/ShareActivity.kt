@@ -5,9 +5,13 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import io.ahara.linkdrop.MainActivity
@@ -27,6 +31,7 @@ class ShareActivity : Activity() {
     private lateinit var tagState: ShareTagState
     private lateinit var tagChipRow: TagChipRow
     private lateinit var freeTextInput: EditText
+    private lateinit var shareShortcutId: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,31 +46,39 @@ class ShareActivity : Activity() {
         tagState = ShareTagState()
         sharedCaptures = parsedCaptures
         clientCaptureIds = parsedCaptures.map { UUID.randomUUID().toString() }
+        shareShortcutId = intent.getStringExtra(Intent.EXTRA_SHORTCUT_ID)
+            ?: shortcutIdFor(parsedCaptures)
         setContentView(contentView(sharePreview(parsedCaptures)))
     }
 
-    private fun contentView(sharedUrl: String): LinearLayout {
+    private fun contentView(sharedUrl: String): View {
         tagChipRow = TagChipRow(this)
         freeTextInput = EditText(this).apply {
             hint = "Tag"
             setSingleLine(true)
+            layoutParams = fullWidthLayoutParams(topMargin = 16)
         }
         val dropButton = Button(this).apply {
             text = getString(R.string.share_drop)
+            layoutParams = fullWidthLayoutParams(topMargin = 16)
             setOnClickListener { saveNow(this) }
         }
         val cancelButton = Button(this).apply {
             text = getString(R.string.share_cancel)
+            layoutParams = fullWidthLayoutParams(topMargin = 8)
             setOnClickListener { finish() }
         }
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(32, 32, 32, 32)
-            addView(TextView(this@ShareActivity).apply { text = sharedUrl })
-            addView(tagChipRow)
-            addView(freeTextInput)
-            addView(dropButton)
-            addView(cancelButton)
+        tagChipRow.layoutParams = fullWidthLayoutParams(topMargin = 16)
+
+        return ScrollView(this).apply {
+            isFillViewport = true
+            addView(centeredContent().apply {
+                addView(previewText(sharedUrl))
+                addView(tagChipRow)
+                addView(freeTextInput)
+                addView(dropButton)
+                addView(cancelButton)
+            })
             loadTagCorpus()
         }
     }
@@ -77,6 +90,7 @@ class ShareActivity : Activity() {
         Thread {
             runCatching { saveCapture(tags) }
                 .onSuccess {
+                    ShareShortcutPublisher.reportUsed(this, shareShortcutId)
                     toast(R.string.share_saved)
                     runOnUiThread { finish() }
                 }
@@ -192,6 +206,39 @@ class ShareActivity : Activity() {
         val provided = fallback.takeIf { it.startsWith("image/") && it != "image/*" }
         return resolved ?: provided ?: "image/jpeg"
     }
+
+    private fun shortcutIdFor(captures: List<SharedCapture>): String =
+        if (captures.any { it is SharedCapture.Image }) {
+            ShareShortcutPublisher.IMAGE_SHORTCUT_ID
+        } else {
+            ShareShortcutPublisher.TEXT_SHORTCUT_ID
+        }
+
+    private fun centeredContent(): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(48, 96, 48, 96)
+            layoutParams = ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+        }
+
+    private fun previewText(value: String): TextView =
+        TextView(this).apply {
+            text = value
+            gravity = Gravity.CENTER
+            layoutParams = fullWidthLayoutParams()
+        }
+
+    private fun fullWidthLayoutParams(topMargin: Int = 0): LinearLayout.LayoutParams =
+        LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply {
+            this.topMargin = topMargin
+        }
 }
 
 private data class ImageMetadata(

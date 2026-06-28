@@ -19,4 +19,8 @@
     <string name="share_saved">Saved to Bookmarker</string>
     <string name="share_failed">Could not save item</string>
     <string name="share_sign_in_required">Sign in to Bookmarker first</string>
+    <string name="shortcut_drop_text_short">Drop text</string>
+    <string name="shortcut_drop_text_long">Drop text or links to Bookmarker</string>
+    <string name="shortcut_drop_image_short">Drop image</string>
+    <string name="shortcut_drop_image_long">Drop images to Bookmarker</string>
 </resources>

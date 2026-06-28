@@ -12,6 +12,11 @@ loads the authenticated `GET /tags` corpus
 when available, renders most-used tags as optional chips, accepts a free-text
 tag, and sends only selected or typed explicit tags.
 
+The app also publishes Android Sharing Shortcuts for text/link and image drops.
+These shortcuts back Direct Share targets in the system sharesheet once the app
+process has started at least once, and successful shares report shortcut usage
+back to Android for ranking.
+
 The Android app signs in directly against the shared Ahara Cognito pool through
 the Linkdrop public app client. It supports the platform software-token MFA
 contract: existing users can answer `SOFTWARE_TOKEN_MFA`, and users who need
@@ -47,6 +52,16 @@ make android-create-release-keystore
 make android-sign-release
 make android-install-debug
 make android-install-release
+```
+
+On Windows, the same Make targets dispatch to PowerShell scripts when
+`OS=Windows_NT` is present. The scripts can also be run directly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-create-release-keystore.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-sign-release.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-install.ps1 debug
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-install.ps1 release
 ```
 
 The signing script writes

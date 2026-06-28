@@ -3,6 +3,21 @@ RUST_MAX_FILE_LINES := 400
 BACKEND_API_TESTS := api_capture api_foundation api_images api_item_mutations api_items api_tags api_thumbnails
 BACKEND_DB_SHARED_TESTS := library_pg_capture library_pg_images library_pg_items library_pg_link_title library_pg_tags library_pg_updates linkdrop_capture_idempotency linkdrop_constraints linkdrop_inbox_status linkdrop_migration linkdrop_processing linkdrop_tags
 BACKEND_DB_PROCESSING_TESTS := processing_pipeline
+BUILD_VARIANT ?= Debug
+
+ifeq ($(OS),Windows_NT)
+POWERSHELL ?= powershell
+ANDROID_STRUCTURE_CHECK := $(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/check-android-share-target.ps1
+ANDROID_ASSEMBLE := $(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/android-assemble.ps1
+ANDROID_CREATE_RELEASE_KEYSTORE := $(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/android-create-release-keystore.ps1
+ANDROID_SIGN_RELEASE := $(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/android-sign-release.ps1
+ANDROID_INSTALL := $(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/android-install.ps1
+else
+ANDROID_STRUCTURE_CHECK := scripts/check-android-share-target.sh
+ANDROID_CREATE_RELEASE_KEYSTORE := scripts/android-create-release-keystore.sh
+ANDROID_SIGN_RELEASE := scripts/android-sign-release.sh
+ANDROID_INSTALL := scripts/android-install.sh
+endif
 
 .PHONY: ci lint rust-lines-check fmt typecheck desktop-typecheck desktop-package test backend-fast-test frontend-test db-test android-structure-check android-build-check android-release-build android-assemble android-create-release-keystore android-sign-release android-install-debug android-install-release docs-check terraform-fmt-check build deploy
 
@@ -43,7 +58,7 @@ db-test:
 	cd backend && cargo test -p processing $(addprefix --test ,$(BACKEND_DB_PROCESSING_TESTS))
 
 android-structure-check:
-	scripts/check-android-share-target.sh
+	$(ANDROID_STRUCTURE_CHECK)
 
 android-build-check:
 	$(MAKE) android-assemble BUILD_VARIANT=Debug
@@ -51,25 +66,30 @@ android-build-check:
 android-release-build:
 	$(MAKE) android-assemble BUILD_VARIANT=Release
 
+ifeq ($(OS),Windows_NT)
+android-assemble:
+	$(ANDROID_ASSEMBLE) -BuildVariant $(BUILD_VARIANT)
+else
 android-assemble:
 	@SDK_ROOT="$${ANDROID_HOME:-$${ANDROID_SDK_ROOT:-$${HOME}/android-sdk}}"; \
 	if [ ! -d "$$SDK_ROOT/platforms/android-36" ]; then \
 		echo "Android SDK platform android-36 not found. Set ANDROID_HOME or ANDROID_SDK_ROOT, or install it under $$HOME/android-sdk."; \
 		exit 1; \
 	fi; \
-	ANDROID_HOME="$$SDK_ROOT" ANDROID_SDK_ROOT="$$SDK_ROOT" android/gradlew -p android --no-daemon :app:assemble$${BUILD_VARIANT:-Debug}
+	ANDROID_HOME="$$SDK_ROOT" ANDROID_SDK_ROOT="$$SDK_ROOT" android/gradlew -p android --no-daemon :app:assemble$(BUILD_VARIANT)
+endif
 
 android-create-release-keystore:
-	scripts/android-create-release-keystore.sh
+	$(ANDROID_CREATE_RELEASE_KEYSTORE)
 
 android-sign-release:
-	scripts/android-sign-release.sh
+	$(ANDROID_SIGN_RELEASE)
 
 android-install-debug:
-	scripts/android-install.sh debug
+	$(ANDROID_INSTALL) debug
 
 android-install-release:
-	scripts/android-install.sh release
+	$(ANDROID_INSTALL) release
 
 docs-check:
 	test -f README.md

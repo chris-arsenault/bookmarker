@@ -15,12 +15,31 @@ release keystore at `$HOME/.android/linkdrop/linkdrop-release.jks` unless
 `LINKDROP_ANDROID_KEYSTORE` overrides it. It refuses to overwrite an existing
 keystore.
 
+On Windows, use the PowerShell variant:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-create-release-keystore.ps1
+```
+
 `scripts/android-sign-release.sh` builds the unsigned release APK, aligns it,
 signs it, verifies it, and writes a `linkdrop-release-signed-*.apk` artifact.
 It prompts for the keystore password without requiring the password on the
 command line.
 
+On Windows:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-sign-release.ps1
+```
+
 `scripts/android-install.sh debug` builds and installs the debug APK.
 `scripts/android-install.sh release` installs the signed release APK and runs
 the signing script first when the signed artifact is missing. It requires
 exactly one authorized device unless `LINKDROP_ANDROID_SERIAL` is set.
+
+On Windows:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-install.ps1 debug
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-install.ps1 release
+```
