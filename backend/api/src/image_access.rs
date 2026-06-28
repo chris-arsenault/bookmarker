@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -16,15 +15,21 @@ pub struct ImageUploadTarget {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ImageObject {
-    pub bytes: Vec<u8>,
-    pub content_type: String,
+pub struct ImageAccessTarget {
+    pub view_url: String,
+    pub download_url: String,
+    pub expires_in_seconds: u64,
 }
 
 #[async_trait]
 pub trait ImageObjectStore: Send + Sync {
     async fn upload_target(&self, key: &str, content_type: &str) -> AppResult<ImageUploadTarget>;
-    async fn read_image(&self, key: &str) -> AppResult<ImageObject>;
+    async fn access_target(
+        &self,
+        key: &str,
+        content_type: &str,
+        download_name: &str,
+    ) -> AppResult<ImageAccessTarget>;
 }
 
 pub struct S3ImageObjectStore {
@@ -46,8 +51,7 @@ impl S3ImageObjectStore {
 #[async_trait]
 impl ImageObjectStore for S3ImageObjectStore {
     async fn upload_target(&self, key: &str, content_type: &str) -> AppResult<ImageUploadTarget> {
-        let config = PresigningConfig::expires_in(Duration::from_secs(15 * 60))
-            .map_err(|err| external_error(err.to_string()))?;
+        let config = presigning_config(15 * 60)?;
         let presigned = self
             .s3
             .put_object()
@@ -63,52 +67,52 @@ impl ImageObjectStore for S3ImageObjectStore {
         })
     }
 
-    async fn read_image(&self, key: &str) -> AppResult<ImageObject> {
-        let output = self
-            .s3
-            .get_object()
-            .bucket(&self.bucket)
-            .key(key)
-            .send()
-            .await
-            .map_err(|err| external_error(err.to_string()))?;
-        let content_type = output
-            .content_type()
-            .unwrap_or("application/octet-stream")
-            .to_string();
-        let bytes = output
-            .body
-            .collect()
-            .await
-            .map_err(|err| external_error(err.to_string()))?
-            .into_bytes()
-            .to_vec();
-        Ok(ImageObject {
-            bytes,
-            content_type,
+    async fn access_target(
+        &self,
+        key: &str,
+        content_type: &str,
+        download_name: &str,
+    ) -> AppResult<ImageAccessTarget> {
+        let expires_in_seconds = 10 * 60;
+        let view_url = self.presigned_get(key, content_type, None).await?;
+        let disposition = content_disposition(download_name);
+        let download_url = self
+            .presigned_get(key, content_type, Some(&disposition))
+            .await?;
+        Ok(ImageAccessTarget {
+            view_url,
+            download_url,
+            expires_in_seconds,
         })
     }
 }
 
-#[derive(Default)]
-pub struct InMemoryImageObjectStore {
-    objects: Arc<HashMap<String, ImageObject>>,
-}
-
-impl InMemoryImageObjectStore {
-    pub fn from_objects(
-        objects: impl IntoIterator<Item = (impl Into<String>, ImageObject)>,
-    ) -> Self {
-        Self {
-            objects: Arc::new(
-                objects
-                    .into_iter()
-                    .map(|(key, object)| (key.into(), object))
-                    .collect(),
-            ),
+impl S3ImageObjectStore {
+    async fn presigned_get(
+        &self,
+        key: &str,
+        content_type: &str,
+        content_disposition: Option<&str>,
+    ) -> AppResult<String> {
+        let mut request = self
+            .s3
+            .get_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .response_content_type(content_type);
+        if let Some(value) = content_disposition {
+            request = request.response_content_disposition(value);
         }
+        let presigned = request
+            .presigned(presigning_config(10 * 60)?)
+            .await
+            .map_err(|err| external_error(err.to_string()))?;
+        Ok(presigned.uri().to_string())
     }
 }
+
+#[derive(Default)]
+pub struct InMemoryImageObjectStore;
 
 #[async_trait]
 impl ImageObjectStore for InMemoryImageObjectStore {
@@ -119,12 +123,30 @@ impl ImageObjectStore for InMemoryImageObjectStore {
         })
     }
 
-    async fn read_image(&self, key: &str) -> AppResult<ImageObject> {
-        self.objects
-            .get(key)
-            .cloned()
-            .ok_or_else(|| AppError::NotFound(format!("image {key}")))
+    async fn access_target(
+        &self,
+        key: &str,
+        _content_type: &str,
+        download_name: &str,
+    ) -> AppResult<ImageAccessTarget> {
+        Ok(ImageAccessTarget {
+            view_url: format!("https://download.example.test/{key}"),
+            download_url: format!("https://download.example.test/{key}?download={download_name}"),
+            expires_in_seconds: 600,
+        })
     }
+}
+
+fn presigning_config(expires_in_seconds: u64) -> AppResult<PresigningConfig> {
+    PresigningConfig::expires_in(Duration::from_secs(expires_in_seconds))
+        .map_err(|err| external_error(err.to_string()))
+}
+
+fn content_disposition(download_name: &str) -> String {
+    format!(
+        "attachment; filename=\"{}\"",
+        download_name.replace(['\\', '"', '\r', '\n'], "_")
+    )
 }
 
 fn upload_headers(content_type: &str) -> HashMap<String, String> {

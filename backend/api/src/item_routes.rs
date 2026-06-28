@@ -41,6 +41,15 @@ struct CaptureImageUploadOutcome {
     upload: crate::image_access::ImageUploadTarget,
 }
 
+#[derive(Debug, Serialize)]
+struct ImageAccessOutcome {
+    view_url: String,
+    download_url: String,
+    content_type: String,
+    download_name: String,
+    expires_in_seconds: u64,
+}
+
 async fn capture_image_upload(
     State(state): State<ApiState>,
     headers: HeaderMap,
@@ -165,25 +174,57 @@ async fn get_item_thumbnail(
         shared::error::AppError::NotFound(format!("thumbnail for item {item_id}"))
     })?;
     let object = state.thumbnail_reader.read_thumbnail(&key).await?;
-    Ok(([(header::CONTENT_TYPE, object.content_type)], object.bytes).into_response())
+    Ok(binary_response(object.content_type, object.bytes))
 }
 
 async fn get_item_image(
     State(state): State<ApiState>,
     headers: HeaderMap,
     Path(item_id): Path<Uuid>,
-) -> Result<Response, ApiError> {
+) -> Result<Json<ImageAccessOutcome>, ApiError> {
     let user = require_user(&state, &headers).await?;
     let item = state.library.get_item(&user, item_id).await?;
-    let image = item
-        .summary
-        .image
-        .ok_or_else(|| shared::error::AppError::NotFound(format!("image for item {item_id}")))?;
+    let image =
+        item.summary.image.as_ref().ok_or_else(|| {
+            shared::error::AppError::NotFound(format!("image for item {item_id}"))
+        })?;
     if image.upload_status != ImageUploadStatus::Uploaded {
         return Err(shared::error::AppError::NotFound(format!("image for item {item_id}")).into());
     }
-    let object = state.image_store.read_image(&image.s3_key).await?;
-    Ok(([(header::CONTENT_TYPE, object.content_type)], object.bytes).into_response())
+    let download_name = image_download_name(&item.summary);
+    let access = state
+        .image_store
+        .access_target(&image.s3_key, &image.content_type, &download_name)
+        .await?;
+    Ok(Json(ImageAccessOutcome {
+        view_url: access.view_url,
+        download_url: access.download_url,
+        content_type: image.content_type.clone(),
+        download_name,
+        expires_in_seconds: access.expires_in_seconds,
+    }))
+}
+
+fn binary_response(content_type: String, bytes: Vec<u8>) -> Response {
+    (
+        [
+            (header::CONTENT_TYPE, content_type),
+            (
+                header::CACHE_CONTROL,
+                "private, max-age=31536000, immutable".to_string(),
+            ),
+        ],
+        bytes,
+    )
+        .into_response()
+}
+
+fn image_download_name(summary: &LibraryItemSummary) -> String {
+    summary
+        .image
+        .as_ref()
+        .and_then(|image| image.original_filename.clone())
+        .unwrap_or_else(|| format!("{}.image", summary.id))
 }
 
 async fn update_item(

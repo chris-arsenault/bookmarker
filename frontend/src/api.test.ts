@@ -181,7 +181,7 @@ describe("ApiClient item capture", () => {
 });
 
 describe("ApiClient image capture", () => {
-  it("api_client_creates_completes_and_fetches_image_uploads", async () => {
+  it("api_client_creates_completes_and_fetches_image_access", async () => {
     const calls: CapturedRequest[] = [];
     const client = new ApiClient({
       baseUrl: "https://api.example.test",
@@ -196,7 +196,13 @@ describe("ApiClient image capture", () => {
           },
         }),
         jsonResponse({ summary: itemSummary("image-1"), notes: "" }),
-        new Response("image", { status: 200, headers: { "content-type": "image/jpeg" } }),
+        jsonResponse({
+          view_url: "https://download.example.test/images/image-1/original",
+          download_url: "https://download.example.test/images/image-1/original?download=phone.jpg",
+          content_type: "image/jpeg",
+          download_name: "phone.jpg",
+          expires_in_seconds: 600,
+        }),
       ]),
     });
 
@@ -212,7 +218,7 @@ describe("ApiClient image capture", () => {
       client_capture_id: "image-1",
     });
     await client.completeImageUpload("image-1");
-    await client.fetchImage("image-1");
+    const access = await client.getImageAccess("image-1");
 
     expect(calls.map((call) => call.method)).toEqual(["POST", "POST", "GET"]);
     expect(calls.map((call) => call.url)).toEqual([
@@ -220,6 +226,8 @@ describe("ApiClient image capture", () => {
       "https://api.example.test/items/image-1/image-upload/complete",
       "https://api.example.test/items/image-1/image",
     ]);
+    expect(access.view_url).toBe("https://download.example.test/images/image-1/original");
+    expect(access.download_name).toBe("phone.jpg");
     expect(JSON.parse(calls[0].body ?? "{}")).toEqual({
       content_type: "image/jpeg",
       title: "Phone image",

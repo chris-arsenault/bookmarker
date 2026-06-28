@@ -48,7 +48,7 @@ pub fn test_app_with_processing_dispatcher(
     test_app_with_state_parts(
         library,
         processing_dispatcher,
-        Arc::new(InMemoryImageObjectStore::default()),
+        Arc::new(InMemoryImageObjectStore),
     )
 }
 

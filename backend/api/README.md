@@ -23,7 +23,7 @@ item is saved.
 | `GET /items/updates`                          | Bearer token | Changed item summaries and deleted item IDs after a cursor                        |
 | `GET /items/{item_id}`                        | Bearer token | Saved item detail                                                                 |
 | `GET /items/{item_id}/thumbnail`              | Bearer token | Linkdrop-owned thumbnail snapshot bytes                                           |
-| `GET /items/{item_id}/image`                  | Bearer token | Uploaded image bytes for an owned image item                                      |
+| `GET /items/{item_id}/image`                  | Bearer token | Presigned uploaded image access URLs for an owned image item                      |
 | `GET /tags`                                   | Bearer token | Explicit tag corpus entries                                                       |
 | `PATCH /items/{item_id}`                      | Bearer token | Updated item detail after item edits                                              |
 | `DELETE /items/{item_id}`                     | Bearer token | Empty response after item deletion                                                |
@@ -94,8 +94,9 @@ same user-entered item title field as URL captures.
 Image upload creation returns the saved item plus an upload target. The client
 uploads the bytes to that target, then calls
 `POST /items/{item_id}/image-upload/complete`. Uploaded images are read through
-`GET /items/{item_id}/image`; the route checks ownership and returns the stored
-image content type with the bytes.
+`GET /items/{item_id}/image`; the route checks ownership and returns short-lived
+presigned object-storage URLs for preview and download. The API Lambda never
+reads or returns original image bytes.
 
 URL capture responses include `summary.url.original_url`,
 `summary.url.canonical_url` when available, and `summary.url.copy_url`.

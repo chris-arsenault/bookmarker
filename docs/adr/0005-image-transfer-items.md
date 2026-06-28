@@ -32,7 +32,9 @@ state, and detail UI as URL and text items.
 
 ## Consequences
 
-The API owns upload-target creation, upload completion, and authenticated image
-reads. Android streams shared image content to the issued upload target. Web and
-desktop clients load image bytes through the authenticated API and render images
-inside the shared item detail surface.
+The API owns upload-target creation, upload completion, and ownership checks for
+image reads. Android streams shared image content to the issued upload target.
+Web and desktop clients request short-lived presigned object-storage URLs from
+the authenticated API, then load image bytes directly from object storage inside
+the shared item detail surface. The API Lambda does not proxy original image
+bytes.

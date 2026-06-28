@@ -9,6 +9,7 @@ import {
 import type {
   LibraryItemDetail,
   LibraryItemSummary,
+  ImageAccessTarget,
   CaptureImageUploadOutcome,
   CaptureImageUploadRequest,
   CaptureLinkRequest,
@@ -119,12 +120,8 @@ export class ApiClient {
     });
   }
 
-  fetchImage(itemId: string) {
-    return authenticatedBlobRequest({
-      baseUrl: this.baseUrl,
-      clientOptions: this.options,
-      path: `/items/${encodeURIComponent(itemId)}/image`,
-    });
+  getImageAccess(itemId: string) {
+    return this.request<ImageAccessTarget>(`/items/${encodeURIComponent(itemId)}/image`);
   }
 
   private request<T>(path: string, requestOptions: ApiRequestOptions = {}) {

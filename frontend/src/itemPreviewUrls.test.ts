@@ -10,16 +10,16 @@ describe("item preview URLs", () => {
     const originalCreateObjectUrl = URL.createObjectURL;
     URL.createObjectURL = vi.fn(() => "blob:snapshot-preview");
     const fetchThumbnail = vi.fn(async () => new Blob(["thumbnail"], { type: "image/jpeg" }));
-    const fetchImage = vi.fn(async () => new Blob(["image"], { type: "image/jpeg" }));
+    const getImageAccess = vi.fn();
 
-    const urls = await previewUrlsForItems({ fetchThumbnail, fetchImage } as unknown as ApiClient, [
-      urlItemWithThumbnail(),
-      uploadedImageItem(),
-    ]);
+    const urls = await previewUrlsForItems(
+      { fetchThumbnail, getImageAccess } as unknown as ApiClient,
+      [urlItemWithThumbnail(), uploadedImageItem()]
+    );
 
     expect(urls).toEqual({ "url-1": "blob:snapshot-preview" });
     expect(fetchThumbnail).toHaveBeenCalledWith("url-1");
-    expect(fetchImage).not.toHaveBeenCalled();
+    expect(getImageAccess).not.toHaveBeenCalled();
     URL.createObjectURL = originalCreateObjectUrl;
   });
 

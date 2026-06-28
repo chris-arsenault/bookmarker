@@ -35,7 +35,7 @@ processing Lambda.
 | `GET /items/updates`                          | Yes  | Current user's changed items and deleted item IDs after a cursor                                             |
 | `GET /items/{item_id}`                        | Yes  | Current user's saved item detail                                                                             |
 | `GET /items/{item_id}/thumbnail`              | Yes  | Current user's Linkdrop-owned snapshot thumbnail                                                             |
-| `GET /items/{item_id}/image`                  | Yes  | Current user's uploaded image bytes                                                                          |
+| `GET /items/{item_id}/image`                  | Yes  | Current user's presigned uploaded image access URLs                                                          |
 | `DELETE /items/{item_id}`                     | Yes  | Delete a current user's item                                                                                 |
 | `GET /tags`                                   | Yes  | Current user's explicit tag corpus                                                                           |
 | `PATCH /items/{item_id}`                      | Yes  | Update title, notes, explicit tags, `watch_status`, and `inbox_status`                                       |
@@ -54,9 +54,11 @@ configured. Dispatch failures are logged but do not fail capture.
 `POST /items/text` stores text payloads in `item_texts` and deduplicates by
 per-user content hash. `POST /items/images/uploads` stores image payload
 metadata in `item_images`, returns an object-storage upload target, and uses the
-completion route to mark the image uploaded. URL, text, and image items share
-title, notes, tags, watched state, inbox state, list filters, update polling,
-and deletion semantics.
+completion route to mark the image uploaded. Image reads are ownership-checked
+by the API and then served directly from object storage through short-lived
+presigned URLs; the API Lambda does not proxy original image bytes. URL, text,
+and image items share title, notes, tags, watched state, inbox state, list
+filters, update polling, and deletion semantics.
 
 The processing Lambda fetches metadata best effort, stores thumbnail bytes via a
 Linkdrop-owned snapshot key in `thumbnail_s3_key`, and writes

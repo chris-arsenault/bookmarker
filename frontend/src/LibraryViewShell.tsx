@@ -36,7 +36,10 @@ export function LibraryViewShell({
   setThumbnailUrls,
   setUpdatesCursor,
 }: LibraryViewShellProps) {
-  const loadImage = useCallback((itemId: string) => apiClient.fetchImage(itemId), [apiClient]);
+  const loadImageAccess = useCallback(
+    (itemId: string) => apiClient.getImageAccess(itemId),
+    [apiClient]
+  );
 
   return (
     <LibraryView
@@ -79,7 +82,7 @@ export function LibraryViewShell({
       }}
       onCloseDetail={() => setLibraryState(clearSelectedItem)}
       onCopyLink={copyLink}
-      onLoadImage={loadImage}
+      onLoadImageAccess={loadImageAccess}
       onOpenSource={openSource}
       onUpdateItem={(itemId, request) =>
         updateItemOrganization(apiClient, itemId, request, setLibraryState)

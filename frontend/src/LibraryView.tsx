@@ -9,6 +9,7 @@ import { TagManager } from "./TagManager";
 import { AppBar, VaultRail } from "./VaultChrome";
 import { config } from "./config";
 import type {
+  ImageAccessTarget,
   LibraryItemDetail,
   LibraryItemSummary,
   CaptureItemOutcome,
@@ -29,7 +30,7 @@ type LibraryViewProps = {
   onFiltersChange: (filters: LibraryFilters) => void;
   onCopyLink: (item: LibraryItemSummary) => void;
   onOpenSource: (url: string) => void;
-  onLoadImage?: (itemId: string) => Promise<Blob>;
+  onLoadImageAccess?: (itemId: string) => Promise<ImageAccessTarget>;
   onUpdateItem: (itemId: string, request: UpdateItemRequest) => Promise<LibraryItemDetail>;
   onCreateText?: (request: CaptureTextRequest) => Promise<CaptureItemOutcome>;
   onCreateLink?: (request: CaptureLinkRequest) => Promise<CaptureItemOutcome>;
@@ -107,7 +108,7 @@ function ReadyLibraryView(props: ReadyLibraryViewProps) {
             onClose={detailModal.close}
             onCopyLink={props.onCopyLink}
             onDeleteItem={props.onDeleteItem}
-            onLoadImage={props.onLoadImage}
+            onLoadImageAccess={props.onLoadImageAccess}
             onOpenSource={props.onOpenSource}
             onUpdateItem={props.onUpdateItem}
           />

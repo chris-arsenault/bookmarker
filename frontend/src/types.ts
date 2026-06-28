@@ -151,6 +151,14 @@ export type ImageUploadTarget = {
   headers: Record<string, string>;
 };
 
+export type ImageAccessTarget = {
+  view_url: string;
+  download_url: string;
+  content_type: string;
+  download_name: string;
+  expires_in_seconds: number;
+};
+
 export type CaptureImageUploadOutcome = {
   item: LibraryItemDetail;
   created: boolean;

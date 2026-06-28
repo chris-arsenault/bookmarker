@@ -45,7 +45,7 @@ PostgreSQL/RDS instance with a per-project database named `linkdrop`.
 | `GET /items/updates`                          | Yes  | Return changed item summaries and tombstones after a cursor for polling clients.                     |
 | `GET /items/{item_id}`                        | Yes  | Return item detail scoped to the current user.                                                       |
 | `GET /items/{item_id}/thumbnail`              | Yes  | Return Linkdrop-owned thumbnail snapshot bytes for an owned URL item.                                |
-| `GET /items/{item_id}/image`                  | Yes  | Return uploaded image bytes for an owned image item.                                                 |
+| `GET /items/{item_id}/image`                  | Yes  | Return short-lived presigned uploaded image access URLs for an owned image item.                      |
 | `PATCH /items/{item_id}`                      | Yes  | Update title, notes, explicit tags, `watch_status`, and `inbox_status`.                              |
 | `DELETE /items/{item_id}`                     | Yes  | Delete an owned item and surface the deletion through update polling.                                |
 | `GET /tags`                                   | Yes  | Return the current user's explicit tag corpus.                                                       |

@@ -2,8 +2,8 @@ mod support;
 
 use std::sync::Arc;
 
-use api::image_access::{ImageObject, InMemoryImageObjectStore};
-use axum::body::{to_bytes, Body};
+use api::image_access::InMemoryImageObjectStore;
+use axum::body::Body;
 use axum::http::{Method, StatusCode};
 use shared::domain::{ArchiveStatus, ImageUploadStatus, InboxStatus, ItemKind, WatchStatus};
 use shared::library::{
@@ -98,18 +98,13 @@ async fn image_upload_complete_marks_image_uploaded() {
 }
 
 #[tokio::test]
-async fn item_image_route_returns_owned_uploaded_image() {
+async fn item_image_route_returns_owned_uploaded_image_access() {
     let item_id = item_id();
-    let key = format!("images/{item_id}/original");
-    let image_store = InMemoryImageObjectStore::from_objects([(
-        key,
-        ImageObject {
-            bytes: b"image-bytes".to_vec(),
-            content_type: "image/png".to_string(),
-        },
-    )]);
     let response = request(
-        support::test_app_with_image_store(seeded_library(item_id), Arc::new(image_store)),
+        support::test_app_with_image_store(
+            seeded_library(item_id),
+            Arc::new(InMemoryImageObjectStore),
+        ),
         Method::GET,
         &format!("/items/{item_id}/image"),
         Some(&bearer_token("image-user")),
@@ -118,13 +113,17 @@ async fn item_image_route_returns_owned_uploaded_image() {
     .await;
 
     assert_eq!(response.status(), StatusCode::OK);
+    let payload = response_json(response).await;
+    assert_eq!(payload["content_type"], "image/png");
+    assert_eq!(payload["download_name"], "phone.png");
+    assert_eq!(payload["expires_in_seconds"], 600);
     assert_eq!(
-        response.headers()["content-type"].to_str().unwrap(),
-        "image/png"
+        payload["view_url"],
+        format!("https://download.example.test/images/{item_id}/original")
     );
     assert_eq!(
-        to_bytes(response.into_body(), usize::MAX).await.unwrap(),
-        b"image-bytes".as_slice()
+        payload["download_url"],
+        format!("https://download.example.test/images/{item_id}/original?download=phone.png")
     );
 }
 

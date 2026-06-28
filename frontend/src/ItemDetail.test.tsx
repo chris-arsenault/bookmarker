@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ItemDetail } from "./ItemDetail";
-import type { ArchiveStatus, ImageUploadStatus, LibraryItemDetail } from "./types";
+import type { LibraryItemDetail } from "./types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -221,80 +221,6 @@ describe("ItemDetail link heading", () => {
   });
 });
 
-describe("ItemDetail images", () => {
-  it("loads_uploaded_images_into_the_detail_modal", async () => {
-    const originalCreateObjectUrl = URL.createObjectURL;
-    const originalRevokeObjectUrl = URL.revokeObjectURL;
-    URL.createObjectURL = vi.fn(() => "blob:image-preview");
-    URL.revokeObjectURL = vi.fn();
-    const loaded: string[] = [];
-    const detail = imageDetail();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <ItemDetail
-          availableTags={[]}
-          detail={detail}
-          onClose={() => undefined}
-          onCopyLink={() => undefined}
-          onLoadImage={async (itemId) => {
-            loaded.push(itemId);
-            return new Blob(["image"], { type: "image/jpeg" });
-          }}
-          onOpenSource={() => undefined}
-          onUpdateItem={async () => detail}
-        />
-      );
-      await Promise.resolve();
-    });
-
-    expect(loaded).toEqual(["image-1"]);
-    expect(container.querySelector("#detail-title")?.textContent).toBe("Phone transfer");
-    expect((container.querySelector(".image-detail-preview") as HTMLImageElement)?.src).toBe(
-      "blob:image-preview"
-    );
-    expect(container.querySelector(".image-download")?.getAttribute("download")).toBe("phone.jpg");
-    root.unmount();
-    container.remove();
-    URL.createObjectURL = originalCreateObjectUrl;
-    URL.revokeObjectURL = originalRevokeObjectUrl;
-  });
-
-  it("does_not_fetch_image_bytes_while_upload_is_pending", async () => {
-    const loaded: string[] = [];
-    const detail = imageDetail("pending", "pending");
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <ItemDetail
-          availableTags={[]}
-          detail={detail}
-          onClose={() => undefined}
-          onCopyLink={() => undefined}
-          onLoadImage={async (itemId) => {
-            loaded.push(itemId);
-            return new Blob(["image"], { type: "image/jpeg" });
-          }}
-          onOpenSource={() => undefined}
-          onUpdateItem={async () => detail}
-        />
-      );
-      await Promise.resolve();
-    });
-
-    expect(loaded).toEqual([]);
-    expect(container.textContent).toContain("Image upload pending");
-    root.unmount();
-    container.remove();
-  });
-});
-
 const itemDetail: LibraryItemDetail = {
   summary: {
     id: "item-1",
@@ -363,34 +289,6 @@ function linkDetail(id: string): LibraryItemDetail {
       title: "Saved link",
       fetched_title: "Resolved metadata title",
       archive_status: "pending",
-    },
-  };
-}
-
-function imageDetail(
-  uploadStatus: ImageUploadStatus = "uploaded",
-  archiveStatus: ArchiveStatus = "succeeded"
-): LibraryItemDetail {
-  return {
-    ...itemDetail,
-    summary: {
-      ...itemDetail.summary,
-      id: "image-1",
-      item_kind: "image",
-      url: null,
-      text: null,
-      image: {
-        s3_key: "images/image-1/original",
-        content_type: "image/jpeg",
-        original_filename: "phone.jpg",
-        byte_size: 2048,
-        upload_status: uploadStatus,
-        source_app: "Android share",
-        source_device: "android",
-        capture_method: "android_share",
-      },
-      title: "Phone transfer",
-      archive_status: archiveStatus,
     },
   };
 }

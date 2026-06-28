@@ -46,6 +46,10 @@ async fn item_thumbnail_route_returns_owned_snapshot() {
         "image/jpeg"
     );
     assert_eq!(
+        response.headers()["cache-control"].to_str().unwrap(),
+        "private, max-age=31536000, immutable"
+    );
+    assert_eq!(
         to_bytes(response.into_body(), usize::MAX).await.unwrap(),
         b"thumbnail-bytes".as_slice()
     );
@@ -115,7 +119,7 @@ fn test_app_with_thumbnail_reader(
             library,
             processing_dispatcher: Arc::new(NoopProcessingDispatcher),
             thumbnail_reader,
-            image_store: Arc::new(InMemoryImageObjectStore::default()),
+            image_store: Arc::new(InMemoryImageObjectStore),
         },
     ))
 }

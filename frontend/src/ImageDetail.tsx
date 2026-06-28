@@ -1,24 +1,24 @@
-import { useEffect, useState } from "react";
-import type { ImageUploadStatus, LibraryItemDetail, LibraryItemSummary } from "./types";
+import { useEffect, useRef, useState } from "react";
+import type { ImageAccessTarget, ImageUploadStatus, LibraryItemDetail } from "./types";
 
-type ImageObjectState = {
+type ImageAccessState = {
   itemId: string;
   status: "idle" | "loading" | "ready" | "error";
-  url: string | null;
+  access: ImageAccessTarget | null;
 };
 
 export function ImageItemDetail({
   detail,
-  onLoadImage,
+  onLoadImageAccess,
 }: {
   detail: LibraryItemDetail;
-  onLoadImage?: (itemId: string) => Promise<Blob>;
+  onLoadImageAccess?: (itemId: string) => Promise<ImageAccessTarget>;
 }) {
   const { summary } = detail;
   const image = summary.image;
-  const imageUrl = useImageObjectUrl(
+  const imageAccess = useImageAccessTarget(
     summary.id,
-    image?.upload_status === "uploaded" ? onLoadImage : undefined
+    image?.upload_status === "uploaded" ? onLoadImageAccess : undefined
   );
   if (!image) {
     return null;
@@ -26,15 +26,15 @@ export function ImageItemDetail({
   return (
     <section className="image-detail-summary" aria-label="Saved image">
       <ImagePreview
-        imageUrl={imageUrl.url}
-        status={imageUrl.status}
+        imageUrl={imageAccess.access?.view_url ?? null}
+        status={imageAccess.status}
         uploadStatus={image.upload_status}
       />
-      {imageUrl.url ? (
+      {imageAccess.access ? (
         <a
           className="secondary-action image-download"
-          download={downloadName(summary)}
-          href={imageUrl.url}
+          download={imageAccess.access.download_name}
+          href={imageAccess.access.download_url}
         >
           Download image
         </a>
@@ -49,7 +49,7 @@ function ImagePreview({
   uploadStatus,
 }: {
   imageUrl: string | null;
-  status: ImageObjectState["status"];
+  status: ImageAccessState["status"];
   uploadStatus: ImageUploadStatus;
 }) {
   if (imageUrl) {
@@ -68,48 +68,44 @@ function ImagePreview({
   );
 }
 
-function useImageObjectUrl(
+function useImageAccessTarget(
   itemId: string,
-  onLoadImage: ((itemId: string) => Promise<Blob>) | undefined
+  onLoadImageAccess: ((itemId: string) => Promise<ImageAccessTarget>) | undefined
 ) {
-  const [state, setState] = useState<ImageObjectState>({
+  const loadImageRef = useRef(onLoadImageAccess);
+  const canLoadImage = Boolean(onLoadImageAccess);
+  const [state, setState] = useState<ImageAccessState>({
     itemId,
-    status: onLoadImage ? "loading" : "idle",
-    url: null,
+    status: canLoadImage ? "loading" : "idle",
+    access: null,
   });
   useEffect(() => {
-    if (!onLoadImage) {
+    loadImageRef.current = onLoadImageAccess;
+  }, [onLoadImageAccess]);
+  useEffect(() => {
+    const loadImage = loadImageRef.current;
+    if (!canLoadImage || !loadImage) {
       return;
     }
     let active = true;
-    let objectUrl: string | null = null;
-    onLoadImage(itemId)
-      .then((blob) => {
-        objectUrl = URL.createObjectURL(blob);
+    setState({ itemId, status: "loading", access: null });
+    loadImage(itemId)
+      .then((access) => {
         if (active) {
-          setState({ itemId, status: "ready", url: objectUrl });
-        } else {
-          URL.revokeObjectURL(objectUrl);
+          setState({ itemId, status: "ready", access });
         }
       })
       .catch(() => {
         if (active) {
-          setState({ itemId, status: "error", url: null });
+          setState({ itemId, status: "error", access: null });
         }
       });
     return () => {
       active = false;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
     };
-  }, [itemId, onLoadImage]);
-  if (!onLoadImage) {
-    return { status: "idle" as const, url: null };
+  }, [canLoadImage, itemId]);
+  if (!canLoadImage) {
+    return { status: "idle" as const, access: null };
   }
-  return state.itemId === itemId ? state : { status: "loading" as const, url: null };
-}
-
-function downloadName(summary: LibraryItemSummary) {
-  return summary.image?.original_filename ?? `${summary.id}.image`;
+  return state.itemId === itemId ? state : { status: "loading" as const, access: null };
 }

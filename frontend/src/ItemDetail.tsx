@@ -6,6 +6,7 @@ import { ImageItemDetail } from "./ImageDetail";
 import { ItemOrganizer } from "./ItemOrganizer";
 import { itemCopyLabel, itemFetchedTitle, itemSourceUrl } from "./itemDisplay";
 import type {
+  ImageAccessTarget,
   LibraryItemDetail,
   LibraryItemSummary,
   TagCorpusEntry,
@@ -20,7 +21,7 @@ export function ItemDetail({
   onClose,
   onCopyLink,
   onOpenSource,
-  onLoadImage,
+  onLoadImageAccess,
   onUpdateItem,
   onDeleteItem,
 }: {
@@ -29,7 +30,7 @@ export function ItemDetail({
   onClose: () => void;
   onCopyLink: (item: LibraryItemDetail["summary"]) => void;
   onOpenSource: (url: string) => void;
-  onLoadImage?: (itemId: string) => Promise<Blob>;
+  onLoadImageAccess?: (itemId: string) => Promise<ImageAccessTarget>;
   onUpdateItem: (itemId: string, request: UpdateItemRequest) => Promise<LibraryItemDetail>;
   onDeleteItem?: (itemId: string) => Promise<void>;
 }) {
@@ -57,7 +58,11 @@ export function ItemDetail({
           key={summary.id}
           onUpdateItem={onUpdateItem}
         />
-        <DetailPrimary detail={detail} onLoadImage={onLoadImage} sourceUrl={sourceUrl} />
+        <DetailPrimary
+          detail={detail}
+          onLoadImageAccess={onLoadImageAccess}
+          sourceUrl={sourceUrl}
+        />
         <DetailActions
           detail={detail}
           onClose={onClose}
@@ -74,18 +79,18 @@ export function ItemDetail({
 function DetailPrimary({
   detail,
   sourceUrl,
-  onLoadImage,
+  onLoadImageAccess,
 }: {
   detail: LibraryItemDetail;
   sourceUrl: string | null;
-  onLoadImage?: (itemId: string) => Promise<Blob>;
+  onLoadImageAccess?: (itemId: string) => Promise<ImageAccessTarget>;
 }) {
   const { summary } = detail;
   if (summary.text) {
     return <TextSnippetDetail detail={detail} />;
   }
   if (summary.image) {
-    return <ImageItemDetail detail={detail} onLoadImage={onLoadImage} />;
+    return <ImageItemDetail detail={detail} onLoadImageAccess={onLoadImageAccess} />;
   }
   return <LinkDetailHeading sourceUrl={sourceUrl} summary={summary} />;
 }
