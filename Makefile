@@ -19,13 +19,17 @@ ANDROID_SIGN_RELEASE := scripts/android-sign-release.sh
 ANDROID_INSTALL := scripts/android-install.sh
 endif
 
-.PHONY: ci lint rust-lines-check fmt typecheck desktop-typecheck desktop-package test backend-fast-test frontend-test db-test android-structure-check android-build-check android-release-build android-assemble android-create-release-keystore android-sign-release android-install-debug android-install-release docs-check terraform-fmt-check build deploy
+.PHONY: ci lint rust-lines-check telemetry-adoption-check fmt typecheck desktop-typecheck desktop-package test backend-fast-test frontend-test db-test android-structure-check android-build-check android-release-build android-assemble android-create-release-keystore android-sign-release android-install-debug android-install-release docs-check terraform-fmt-check build deploy
 
-ci: lint fmt typecheck desktop-typecheck test android-structure-check android-build-check docs-check terraform-fmt-check
+ci: lint telemetry-adoption-check fmt typecheck desktop-typecheck test android-structure-check android-build-check docs-check terraform-fmt-check
 
 lint: rust-lines-check
 	cd backend && cargo clippy --workspace --all-targets -- $(RUST_CLIPPY_FLAGS)
 	cd frontend && pnpm exec eslint .
+
+telemetry-adoption-check:
+	cargo install --git https://github.com/chris-arsenault/ahara-infra.git ahara-lambda-telemetry --bin ahara-telemetry-adoption-check --locked --force
+	ahara-telemetry-adoption-check backend
 
 rust-lines-check:
 	@violations=$$(find backend -path "*/target" -prune -o -name "*.rs" -type f -print | while IFS= read -r file; do lines=$$(wc -l < "$$file"); if [ "$$lines" -gt "$(RUST_MAX_FILE_LINES)" ]; then printf "%s %s\n" "$$lines" "$$file"; fi; done); \

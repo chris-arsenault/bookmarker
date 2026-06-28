@@ -5,6 +5,7 @@ stack:
   - rust
   - typescript
   - terraform
+rust_telemetry_adoption: true
 rust_artifacts:
   lambdas:
     - api

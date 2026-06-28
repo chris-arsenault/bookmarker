@@ -1,3 +1,4 @@
+use ahara_lambda_telemetry::{Operation, TelemetryConfig};
 use aws_config::BehaviorVersion;
 use lambda_runtime::{service_fn, Error, LambdaEvent};
 use processing::extractors::{OpenGraphExtractor, ReqwestMetadataFetch};
@@ -28,7 +29,19 @@ enum ProcessingEventError {
 
 async fn handler(event: LambdaEvent<ProcessEvent>) -> Result<(), Error> {
     let item_id = event.payload.required_item_id()?;
-    runtime_pipeline().await?.process_item(item_id).await?;
+    Operation::new(
+        TelemetryConfig::new("linkdrop-processing"),
+        "processing.process_item",
+    )
+    .with_domain("processing")
+    .observe(async {
+        runtime_pipeline()
+            .await?
+            .process_item(item_id)
+            .await
+            .map_err(|err| -> Error { Box::new(err) })
+    })
+    .await?;
     Ok(())
 }
 
@@ -55,11 +68,9 @@ async fn runtime_pipeline() -> Result<
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .json()
-        .init();
-    lambda_runtime::run(service_fn(handler)).await
+    let telemetry = TelemetryConfig::new("linkdrop-processing");
+    ahara_lambda_telemetry::init_lambda_logging(&telemetry);
+    ahara_lambda_telemetry::run_event_lambda(telemetry, service_fn(handler)).await
 }
 
 #[cfg(test)]

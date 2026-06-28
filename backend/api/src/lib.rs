@@ -14,7 +14,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 use cors::cors_layer;
 use serde_json::{json, Value};
-use shared::auth::{AuthVerifier, CognitoJwtVerifier, UserContext};
+use shared::auth::{AlbValidatedJwtVerifier, AuthVerifier, UserContext};
 use shared::config::AppConfig;
 use shared::db::{connect_pool, DbPool};
 use shared::error::{AppError, AppResult};
@@ -52,7 +52,7 @@ impl ApiState {
             config.clone(),
             db.clone(),
             ApiStateServices {
-                auth: Arc::new(CognitoJwtVerifier::from_config(&config.cognito)),
+                auth: Arc::new(AlbValidatedJwtVerifier::new()),
                 library: Arc::new(PgLibraryService::new(db.clone())),
                 processing_dispatcher: Arc::new(
                     LambdaProcessingDispatcher::from_env(db.clone()).await,

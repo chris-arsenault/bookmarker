@@ -41,6 +41,25 @@ pub trait JwksProvider: Send + Sync {
     async fn jwks(&self) -> AppResult<Arc<JwkSet>>;
 }
 
+#[derive(Clone, Default)]
+pub struct AlbValidatedJwtVerifier;
+
+impl AlbValidatedJwtVerifier {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[async_trait]
+impl AuthVerifier for AlbValidatedJwtVerifier {
+    async fn context_from_authorization(
+        &self,
+        auth_header: Option<&str>,
+    ) -> AppResult<UserContext> {
+        decode_unverified_claims(extract_bearer(auth_header)?)
+    }
+}
+
 #[derive(Clone)]
 pub struct CognitoJwtVerifier {
     issuer: String,
@@ -214,7 +233,7 @@ pub(crate) mod tests {
 
     use crate::error::AppError;
 
-    use super::{decode_unverified_claims, extract_bearer};
+    use super::{decode_unverified_claims, extract_bearer, AlbValidatedJwtVerifier, AuthVerifier};
 
     fn token(payload: serde_json::Value) -> String {
         let header = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"none"}"#);
@@ -266,5 +285,26 @@ pub(crate) mod tests {
         assert_eq!(context.email.as_deref(), Some("chris@example.test"));
         assert_eq!(context.username.as_deref(), Some("chris"));
         assert_eq!(context.groups, ["admin", "linkdrop"]);
+    }
+
+    #[tokio::test]
+    async fn alb_validated_verifier_uses_validated_bearer_claims() {
+        let verifier = AlbValidatedJwtVerifier::new();
+
+        let context = verifier
+            .context_from_authorization(Some(&format!(
+                "Bearer {}",
+                token(json!({
+                    "sub": "already-validated-sub",
+                    "email": "chris@example.test",
+                    "cognito:username": "chris"
+                }))
+            )))
+            .await
+            .unwrap();
+
+        assert_eq!(context.sub, "already-validated-sub");
+        assert_eq!(context.email.as_deref(), Some("chris@example.test"));
+        assert_eq!(context.username.as_deref(), Some("chris"));
     }
 }

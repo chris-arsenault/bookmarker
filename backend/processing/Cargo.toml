@@ -8,6 +8,7 @@ name = "processing"
 path = "src/main.rs"
 
 [dependencies]
+ahara-lambda-telemetry = { workspace = true }
 async-trait = { workspace = true }
 aws-config = { workspace = true }
 aws-sdk-lambda = { workspace = true }

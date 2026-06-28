@@ -3,6 +3,21 @@
 version = 4
 
 [[package]]
+name = "ahara-lambda-telemetry"
+version = "0.1.0"
+source = "git+https://github.com/chris-arsenault/ahara-infra.git#cf585d0d01065277333dff2c8ce01ba514e804dd"
+dependencies = [
+ "bytes",
+ "lambda_http",
+ "lambda_runtime",
+ "serde",
+ "serde_json",
+ "tokio-stream",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -27,6 +42,7 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 name = "api"
 version = "0.1.0"
 dependencies = [
+ "ahara-lambda-telemetry",
  "async-trait",
  "aws-config",
  "aws-sdk-lambda",
@@ -2500,6 +2516,7 @@ dependencies = [
 name = "processing"
 version = "0.1.0"
 dependencies = [
+ "ahara-lambda-telemetry",
  "async-trait",
  "aws-config",
  "aws-sdk-lambda",

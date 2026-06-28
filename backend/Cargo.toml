@@ -4,6 +4,7 @@ members = ["shared", "api", "processing"]
 
 [workspace.dependencies]
 async-trait = "0.1"
+ahara-lambda-telemetry = { git = "https://github.com/chris-arsenault/ahara-infra.git", package = "ahara-lambda-telemetry" }
 axum = "0.8"
 aws-config = "1"
 aws-sdk-lambda = "1"
