@@ -4,15 +4,8 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { LibraryView } from "./LibraryView";
-import {
-  emptyFilters,
-  emptyTagState,
-  libraryState,
-  mergeTagsNoop,
-  renameTagNoop,
-  updateItemNoop,
-} from "../test-fixtures/LibraryViewFixtures";
+import { emptyTagState, libraryState } from "../test-fixtures/LibraryViewFixtures";
+import { libraryView } from "../test-fixtures/LibraryViewHarness";
 import type {
   LibraryItemDetail,
   MergeTagsRequest,
@@ -25,19 +18,7 @@ import type {
 describe("LibraryView browsing", () => {
   it("renders_authenticated_library_table_with_status_and_collapsed_search", () => {
     const html = renderToString(
-      <LibraryView
-        state={libraryState}
-        filters={emptyFilters}
-        thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
-        onFiltersChange={() => undefined}
-        onSelectItem={() => undefined}
-        onCloseDetail={() => undefined}
-        onCopyLink={() => undefined}
-        onOpenSource={() => undefined}
-        onUpdateItem={updateItemNoop}
-        onRenameTag={renameTagNoop}
-        onMergeTags={mergeTagsNoop}
-      />
+      libraryView({ thumbnailUrls: { "item-1": "/items/item-1/thumbnail" } })
     );
 
     expect(html).toContain("Saved video");
@@ -51,19 +32,7 @@ describe("LibraryView browsing", () => {
 
   it("renders_filter_controls_for_platform_tag_date_archive_watch_and_text", () => {
     const html = renderToString(
-      <LibraryView
-        state={libraryState}
-        filters={emptyFilters}
-        thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
-        onFiltersChange={() => undefined}
-        onSelectItem={() => undefined}
-        onCloseDetail={() => undefined}
-        onCopyLink={() => undefined}
-        onOpenSource={() => undefined}
-        onUpdateItem={updateItemNoop}
-        onRenameTag={renameTagNoop}
-        onMergeTags={mergeTagsNoop}
-      />
+      libraryView({ thumbnailUrls: { "item-1": "/items/item-1/thumbnail" } })
     );
 
     expect(html).toContain("Platform");
@@ -85,19 +54,12 @@ describe("LibraryView organizer", () => {
 
     await act(async () => {
       root.render(
-        <LibraryView
-          state={libraryState}
-          filters={emptyFilters}
-          thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
-          onFiltersChange={() => undefined}
-          onSelectItem={() => undefined}
-          onCloseDetail={() => closeCalls.push("closed")}
-          onCopyLink={() => undefined}
-          onOpenSource={() => undefined}
-          onUpdateItem={updateItemNoop}
-          onRenameTag={renameTagNoop}
-          onMergeTags={mergeTagsNoop}
-        />
+        libraryView({
+          actions: {
+            closeDetail: () => closeCalls.push("closed"),
+          },
+          thumbnailUrls: { "item-1": "/items/item-1/thumbnail" },
+        })
       );
     });
 
@@ -120,21 +82,7 @@ describe("LibraryView organizer", () => {
     const root = createRoot(container);
 
     await act(async () => {
-      root.render(
-        <LibraryView
-          state={libraryState}
-          filters={emptyFilters}
-          thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
-          onFiltersChange={() => undefined}
-          onSelectItem={() => undefined}
-          onCloseDetail={() => undefined}
-          onCopyLink={() => undefined}
-          onOpenSource={() => undefined}
-          onUpdateItem={updateItemNoop}
-          onRenameTag={renameTagNoop}
-          onMergeTags={mergeTagsNoop}
-        />
-      );
+      root.render(libraryView({ thumbnailUrls: { "item-1": "/items/item-1/thumbnail" } }));
     });
 
     await openFirstItem(container);
@@ -157,22 +105,15 @@ describe("LibraryView organizer", () => {
 
     await act(async () => {
       root.render(
-        <LibraryView
-          state={libraryState}
-          filters={emptyFilters}
-          thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
-          onFiltersChange={() => undefined}
-          onSelectItem={() => undefined}
-          onCloseDetail={() => undefined}
-          onCopyLink={() => undefined}
-          onOpenSource={() => undefined}
-          onUpdateItem={async (_itemId, request) => {
-            updates.push(request);
-            return updatedFixtureDetail(request);
-          }}
-          onRenameTag={renameTagNoop}
-          onMergeTags={mergeTagsNoop}
-        />
+        libraryView({
+          actions: {
+            updateItem: async (_itemId, request) => {
+              updates.push(request);
+              return updatedFixtureDetail(request);
+            },
+          },
+          thumbnailUrls: { "item-1": "/items/item-1/thumbnail" },
+        })
       );
     });
 
@@ -203,25 +144,19 @@ describe("LibraryView tag management", () => {
 
     await act(async () => {
       root.render(
-        <LibraryView
-          state={libraryState}
-          filters={emptyFilters}
-          thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
-          onFiltersChange={() => undefined}
-          onSelectItem={() => undefined}
-          onCloseDetail={() => undefined}
-          onCopyLink={() => undefined}
-          onOpenSource={() => undefined}
-          onUpdateItem={updateItemNoop}
-          onRenameTag={async (tagId, request) => {
-            renameCalls.push([tagId, request]);
-            return libraryState.tags;
-          }}
-          onMergeTags={async (tagId, request) => {
-            mergeCalls.push([tagId, request]);
-            return libraryState.tags;
-          }}
-        />
+        libraryView({
+          actions: {
+            mergeTags: async (tagId, request) => {
+              mergeCalls.push([tagId, request]);
+              return libraryState.tags;
+            },
+            renameTag: async (tagId, request) => {
+              renameCalls.push([tagId, request]);
+              return libraryState.tags;
+            },
+          },
+          thumbnailUrls: { "item-1": "/items/item-1/thumbnail" },
+        })
       );
     });
 
@@ -238,21 +173,7 @@ describe("LibraryView tag management", () => {
   });
 
   it("renders_empty_tag_corpus_without_starter_tags", () => {
-    const html = renderToString(
-      <LibraryView
-        state={emptyTagState}
-        filters={emptyFilters}
-        thumbnailUrls={{}}
-        onFiltersChange={() => undefined}
-        onSelectItem={() => undefined}
-        onCloseDetail={() => undefined}
-        onCopyLink={() => undefined}
-        onOpenSource={() => undefined}
-        onUpdateItem={updateItemNoop}
-        onRenameTag={renameTagNoop}
-        onMergeTags={mergeTagsNoop}
-      />
-    );
+    const html = renderToString(libraryView({ state: emptyTagState, thumbnailUrls: {} }));
 
     expect(html).toContain("No tags yet");
     expect(html).not.toContain("Starter");
@@ -289,19 +210,39 @@ async function choosePopoverOption(container: HTMLElement, triggerLabel: string,
   });
   await act(async () => {
     findButton(container, option).click();
-    await Promise.resolve();
+    await settleAsyncUpdates();
   });
 }
 
 async function selectTag(container: HTMLElement, tag: string) {
+  await waitForTagInput(container);
   await act(async () => {
     container.querySelector<HTMLInputElement>('input[aria-label="Tags"]')?.click();
     await Promise.resolve();
   });
   await act(async () => {
-    findButton(container, tag).click();
+    const dropdown = container.querySelector(".tag-selector-dropdown") as HTMLElement;
+    findButton(dropdown, tag).click();
     await Promise.resolve();
   });
+}
+
+async function waitForTagInput(container: HTMLElement) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="Tags"]');
+    if (input && !input.disabled) {
+      return;
+    }
+    await act(async () => {
+      await settleAsyncUpdates();
+    });
+  }
+  throw new Error("Tags input stayed disabled");
+}
+
+async function settleAsyncUpdates() {
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 function setNativeValue(input: HTMLInputElement | HTMLTextAreaElement, value: string) {

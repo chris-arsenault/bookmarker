@@ -1,67 +1,45 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { FilterBar } from "./FilterBar";
 import { ItemDetail } from "./ItemDetail";
 import { LibraryFeed } from "./LibraryFeed";
-import { createLibraryViewModel, type LibraryState, type LibraryViewModel } from "./libraryState";
+import { useLibraryActions } from "./LibraryActionsContext";
+import { createLibraryViewModel, type LibraryViewModel } from "./libraryState";
 import { platformOptions, tagOptions, type LibraryFilters } from "./libraryFilters";
 import { QuickTextCapture } from "./QuickTextCapture";
 import { TagManager } from "./TagManager";
 import { AppBar, VaultRail } from "./VaultChrome";
 import { config } from "./config";
-import type {
-  ImageAccessTarget,
-  LibraryItemDetail,
-  LibraryItemSummary,
-  CaptureItemOutcome,
-  CaptureLinkRequest,
-  CaptureTextRequest,
-  MergeTagsRequest,
-  RenameTagRequest,
-  TagCorpusEntry,
-  UpdateItemRequest,
-} from "./types";
+import type { LibraryItemDetail, LibraryItemSummary, TagCorpusEntry } from "./types";
+import type { LibrarySnapshot } from "./useLibraryController";
 
 type LibraryViewProps = {
-  state: LibraryState;
-  filters: LibraryFilters;
-  thumbnailUrls: Record<string, string>;
-  onSelectItem: (itemId: string) => void;
-  onCloseDetail: () => void;
-  onFiltersChange: (filters: LibraryFilters) => void;
-  onCopyLink: (item: LibraryItemSummary) => void;
-  onOpenSource: (url: string) => void;
-  onLoadImageAccess?: (itemId: string) => Promise<ImageAccessTarget>;
-  onUpdateItem: (itemId: string, request: UpdateItemRequest) => Promise<LibraryItemDetail>;
-  onCreateText?: (request: CaptureTextRequest) => Promise<CaptureItemOutcome>;
-  onCreateLink?: (request: CaptureLinkRequest) => Promise<CaptureItemOutcome>;
-  onDeleteItem?: (itemId: string) => Promise<void>;
-  onRenameTag: (tagId: string, request: RenameTagRequest) => Promise<TagCorpusEntry[]>;
-  onMergeTags: (sourceTagId: string, request: MergeTagsRequest) => Promise<TagCorpusEntry[]>;
+  snapshot: LibrarySnapshot;
 };
 
-type ReadyLibraryViewProps = Omit<LibraryViewProps, "state"> & {
+type ReadyLibraryViewProps = {
+  snapshot: LibrarySnapshot;
   viewModel: LibraryViewModel;
 };
 
-export function LibraryView(props: LibraryViewProps) {
-  const viewModel = createLibraryViewModel(props.state);
+export function LibraryView({ snapshot }: LibraryViewProps) {
+  const viewModel = useMemo(() => createLibraryViewModel(snapshot.state), [snapshot.state]);
   if (viewModel.status !== "ready") {
     return <InactiveLibraryView status={viewModel.status} message={viewModel.errorMessage} />;
   }
-  return <ReadyLibraryView {...props} viewModel={viewModel} />;
+  return <ReadyLibraryView snapshot={snapshot} viewModel={viewModel} />;
 }
 
-function ReadyLibraryView(props: ReadyLibraryViewProps) {
-  const { filters, viewModel } = props;
-  const detailModal = useDetailModal(
-    viewModel.selectedDetail,
-    props.onSelectItem,
-    props.onCloseDetail
+function ReadyLibraryView({ snapshot, viewModel }: ReadyLibraryViewProps) {
+  const { changeFilters: applyFilters, closeDetail, selectItem } = useLibraryActions();
+  const { filters, thumbnailUrls } = snapshot;
+  const detailModal = useDetailModal(viewModel.selectedDetail, selectItem, closeDetail);
+  const changeFilters = useCallback(
+    (nextFilters: LibraryFilters) => {
+      detailModal.close();
+      applyFilters(nextFilters);
+    },
+    [applyFilters, detailModal]
   );
-  const changeFilters = (nextFilters: LibraryFilters) => {
-    detailModal.close();
-    props.onFiltersChange(nextFilters);
-  };
 
   return (
     <div className="vault">
@@ -71,11 +49,7 @@ function ReadyLibraryView(props: ReadyLibraryViewProps) {
         onFiltersChange={changeFilters}
         tagCount={viewModel.tags.length}
       >
-        <RailCapture
-          tags={viewModel.tags}
-          onCreateLink={props.onCreateLink}
-          onCreateText={props.onCreateText}
-        />
+        <RailCapture tags={viewModel.tags} />
       </VaultRail>
       <main className="workspace">
         <AppBar
@@ -86,19 +60,14 @@ function ReadyLibraryView(props: ReadyLibraryViewProps) {
         <div className="workspace-body">
           <div className="primary-column">
             <SearchHeader
-              activeFilters={activeFilterCount(filters)}
               filters={filters}
+              items={viewModel.items}
               onFiltersChange={changeFilters}
-              onMergeTags={props.onMergeTags}
-              onRenameTag={props.onRenameTag}
-              platforms={platformOptions(viewModel.items)}
-              tags={tagOptions(viewModel.tags)}
               tagCorpus={viewModel.tags}
             />
             <FeedPanel
-              thumbnailUrls={props.thumbnailUrls}
+              thumbnailUrls={thumbnailUrls}
               viewModel={viewModel}
-              onCopyLink={props.onCopyLink}
               onSelectItem={detailModal.open}
             />
           </div>
@@ -106,11 +75,6 @@ function ReadyLibraryView(props: ReadyLibraryViewProps) {
             availableTags={viewModel.tags}
             detail={detailModal.detail}
             onClose={detailModal.close}
-            onCopyLink={props.onCopyLink}
-            onDeleteItem={props.onDeleteItem}
-            onLoadImageAccess={props.onLoadImageAccess}
-            onOpenSource={props.onOpenSource}
-            onUpdateItem={props.onUpdateItem}
           />
         </div>
       </main>
@@ -118,39 +82,28 @@ function ReadyLibraryView(props: ReadyLibraryViewProps) {
   );
 }
 
-function RailCapture({
-  tags,
-  onCreateText,
-  onCreateLink,
-}: {
-  tags: TagCorpusEntry[];
-  onCreateText: ReadyLibraryViewProps["onCreateText"];
-  onCreateLink: ReadyLibraryViewProps["onCreateLink"];
-}) {
-  if (!onCreateText || !onCreateLink) {
-    return null;
-  }
-  return <QuickTextCapture tags={tags} onCreateLink={onCreateLink} onCreateText={onCreateText} />;
+function RailCapture({ tags }: { tags: TagCorpusEntry[] }) {
+  const { createLink, createText } = useLibraryActions();
+  return <QuickTextCapture tags={tags} onCreateLink={createLink} onCreateText={createText} />;
 }
 
 function FeedPanel({
   viewModel,
   thumbnailUrls,
-  onCopyLink,
   onSelectItem,
 }: {
   viewModel: LibraryViewModel;
   thumbnailUrls: Record<string, string>;
-  onCopyLink: (item: LibraryItemSummary) => void;
   onSelectItem: (itemId: string) => void;
 }) {
+  const { copyItem } = useLibraryActions();
   return (
     <div className="feed-scroll">
       <LibraryFeed
         items={viewModel.items}
         selectedItemId={viewModel.selectedItem?.id ?? null}
         thumbnailUrls={thumbnailUrls}
-        onCopyItem={onCopyLink}
+        onCopyItem={copyItem}
         onSelectItem={onSelectItem}
       />
     </div>
@@ -163,53 +116,48 @@ function useDetailModal(
   onCloseDetail: () => void
 ) {
   const [modalItemId, setModalItemId] = useState<string | null>(null);
-  return {
-    detail: selectedDetail?.summary.id === modalItemId ? selectedDetail : null,
-    open: (itemId: string) => {
+  const detail = selectedDetail?.summary.id === modalItemId ? selectedDetail : null;
+  const open = useCallback(
+    (itemId: string) => {
       setModalItemId(itemId);
       onSelectItem(itemId);
     },
-    close: () => {
-      setModalItemId(null);
-      onCloseDetail();
-    },
-  };
+    [onSelectItem]
+  );
+  const close = useCallback(() => {
+    setModalItemId(null);
+    onCloseDetail();
+  }, [onCloseDetail]);
+  return useMemo(() => ({ close, detail, open }), [close, detail, open]);
 }
 
 function SearchHeader({
   filters,
-  platforms,
-  tags,
+  items,
   tagCorpus,
-  activeFilters,
   onFiltersChange,
-  onRenameTag,
-  onMergeTags,
 }: {
   filters: LibraryFilters;
-  platforms: ReturnType<typeof platformOptions>;
-  tags: ReturnType<typeof tagOptions>;
+  items: LibraryItemSummary[];
   tagCorpus: TagCorpusEntry[];
-  activeFilters: number;
   onFiltersChange: (filters: LibraryFilters) => void;
-  onRenameTag: (tagId: string, request: RenameTagRequest) => Promise<TagCorpusEntry[]>;
-  onMergeTags: (sourceTagId: string, request: MergeTagsRequest) => Promise<TagCorpusEntry[]>;
 }) {
+  const { mergeTags, renameTag } = useLibraryActions();
   return (
     <details className="search-drawer">
       <summary>
         <span>Search and filters</span>
-        <small>{activeFilters} active</small>
+        <small>{activeFilterCount(filters)} active</small>
       </summary>
       <FilterBar
         filters={filters}
-        platforms={platforms}
-        tags={tags}
+        platforms={platformOptions(items)}
+        tags={tagOptions(tagCorpus)}
         onFiltersChange={onFiltersChange}
       />
       <details className="corpus">
         <summary>Tag corpus</summary>
-        <TagManager tags={tagCorpus} onMergeTags={onMergeTags} onRenameTag={onRenameTag} />
+        <TagManager tags={tagCorpus} onMergeTags={mergeTags} onRenameTag={renameTag} />
       </details>
     </details>
   );

@@ -1,6 +1,5 @@
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 import type { ApiClient } from "./api";
-import type { AuthState } from "./auth";
 import { mergePreviewUrls, previewUrlsForItems, type PreviewUrls } from "./itemPreviewUrls";
 import { libraryFiltersToApiFilters, type LibraryFilters } from "./libraryFilters";
 import type { LibraryState } from "./libraryState";
@@ -8,7 +7,6 @@ import { applyLibraryUpdates, updateCursorString, updatePollInterval } from "./l
 
 export function useLibraryUpdatePoller({
   apiClient,
-  authStatus,
   filters,
   libraryState,
   updatesCursor,
@@ -17,7 +15,6 @@ export function useLibraryUpdatePoller({
   setThumbnailUrls,
 }: {
   apiClient: ApiClient;
-  authStatus: AuthState["status"];
   filters: LibraryFilters;
   libraryState: LibraryState;
   updatesCursor: string | null;
@@ -29,7 +26,7 @@ export function useLibraryUpdatePoller({
   const pollMs = readyItems ? updatePollInterval(readyItems) : null;
 
   useEffect(() => {
-    if (authStatus !== "signed-in" || !updatesCursor || !pollMs) {
+    if (!updatesCursor || !pollMs) {
       return;
     }
     let stopped = false;
@@ -63,7 +60,6 @@ export function useLibraryUpdatePoller({
     };
   }, [
     apiClient,
-    authStatus,
     filters,
     pollMs,
     setLibraryState,

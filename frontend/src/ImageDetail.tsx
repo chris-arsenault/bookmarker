@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ImageAccessTarget, ImageUploadStatus, LibraryItemDetail } from "./types";
+import { useImageAccessLoader, type ImageAccessLoader } from "./ImageAccessContext";
 
 type ImageAccessState = {
   itemId: string;
@@ -7,18 +8,13 @@ type ImageAccessState = {
   access: ImageAccessTarget | null;
 };
 
-export function ImageItemDetail({
-  detail,
-  onLoadImageAccess,
-}: {
-  detail: LibraryItemDetail;
-  onLoadImageAccess?: (itemId: string) => Promise<ImageAccessTarget>;
-}) {
+export function ImageItemDetail({ detail }: { detail: LibraryItemDetail }) {
+  const loadImageAccess = useImageAccessLoader();
   const { summary } = detail;
   const image = summary.image;
   const imageAccess = useImageAccessTarget(
     summary.id,
-    image?.upload_status === "uploaded" ? onLoadImageAccess : undefined
+    image?.upload_status === "uploaded" ? loadImageAccess : null
   );
   if (!image) {
     return null;
@@ -68,20 +64,17 @@ function ImagePreview({
   );
 }
 
-function useImageAccessTarget(
-  itemId: string,
-  onLoadImageAccess: ((itemId: string) => Promise<ImageAccessTarget>) | undefined
-) {
-  const loadImageRef = useRef(onLoadImageAccess);
-  const canLoadImage = Boolean(onLoadImageAccess);
+function useImageAccessTarget(itemId: string, loadImageAccess: ImageAccessLoader | null) {
+  const loadImageRef = useRef(loadImageAccess);
+  const canLoadImage = Boolean(loadImageAccess);
   const [state, setState] = useState<ImageAccessState>({
     itemId,
     status: canLoadImage ? "loading" : "idle",
     access: null,
   });
   useEffect(() => {
-    loadImageRef.current = onLoadImageAccess;
-  }, [onLoadImageAccess]);
+    loadImageRef.current = loadImageAccess;
+  }, [loadImageAccess]);
   useEffect(() => {
     const loadImage = loadImageRef.current;
     if (!canLoadImage || !loadImage) {

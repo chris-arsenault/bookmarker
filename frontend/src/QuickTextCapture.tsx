@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { desktopBridge } from "./desktopBridge";
 import { QuickCaptureActions } from "./QuickCaptureActions";
 import { SaveErrorModal } from "./SaveErrorModal";
@@ -15,6 +15,30 @@ type SaveState = {
 };
 
 type CaptureMode = "text" | "link";
+type CaptureDraft = {
+  mode: CaptureMode;
+  text: string;
+  title: string;
+  url: string;
+  tagInput: string;
+  selectedTags: string[];
+};
+
+type CaptureCommands = {
+  createLink: (request: CaptureLinkRequest) => Promise<CaptureItemOutcome>;
+  createText: (request: CaptureTextRequest) => Promise<CaptureItemOutcome>;
+};
+
+type DraftUpdate = (patch: Partial<CaptureDraft>) => void;
+
+const emptyDraft: CaptureDraft = {
+  mode: "text",
+  selectedTags: [],
+  tagInput: "",
+  text: "",
+  title: "",
+  url: "",
+};
 
 export function QuickTextCapture({
   tags,
@@ -25,93 +49,61 @@ export function QuickTextCapture({
   onCreateText: (request: CaptureTextRequest) => Promise<CaptureItemOutcome>;
   onCreateLink: (request: CaptureLinkRequest) => Promise<CaptureItemOutcome>;
 }) {
-  const [mode, setMode] = useState<CaptureMode>("text");
-  const [text, setText] = useState("");
-  const [url, setUrl] = useState("");
-  const [title, setTitle] = useState("");
-  const [tagInput, setTagInput] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const {
+    clearSavedDraft,
+    toggleTag: toggleSelectedTag,
+    update: updateDraft,
+    value: draft,
+  } = useCaptureDraft();
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<SaveState>({ kind: "idle", text: "" });
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const popularTags = useMemo(() => tags.slice(0, 8), [tags]);
+  const closeError = useCallback(() => setErrorDetail(null), []);
+  const changeMode = useCallback((mode: CaptureMode) => updateDraft({ mode }), [updateDraft]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await saveCapture({
-      mode,
-      text,
-      url,
-      title,
-      tagInput,
-      selectedTags,
-      onCreateText,
-      onCreateLink,
-      setText,
-      setUrl,
-      setTitle,
-      setTagInput,
-      setSelectedTags,
-      setSaving,
-      setMessage,
-      setErrorDetail,
+      clearDraft: clearSavedDraft,
+      commands: { createLink: onCreateLink, createText: onCreateText },
+      draft,
+      feedback: { setErrorDetail, setMessage, setSaving },
     });
   };
 
   return (
     <>
       <form className="quick-capture" onSubmit={submit}>
-        <QuickCaptureField
-          disabled={saving}
-          mode={mode}
-          setText={setText}
-          setUrl={setUrl}
-          setTitle={setTitle}
-          text={text}
-          title={title}
-          url={url}
-        />
+        <QuickCaptureField draft={draft} disabled={saving} onDraftChange={updateDraft} />
         <QuickCaptureActions
-          canSave={canSaveDraft(mode, text, url)}
+          canSave={canSaveDraft(draft)}
           message={message}
-          mode={mode}
+          mode={draft.mode}
           saving={saving}
-          setMode={setMode}
+          setMode={changeMode}
         />
         <QuickTagSelector
+          draft={draft}
           disabled={saving}
-          onTagInputChange={setTagInput}
-          onToggleTag={(tag) => setSelectedTags(toggleTag(selectedTags, tag))}
+          onDraftChange={updateDraft}
+          onToggleTag={toggleSelectedTag}
           popularTags={popularTags}
-          selectedTags={selectedTags}
-          tagInput={tagInput}
         />
       </form>
-      {errorDetail ? (
-        <SaveErrorModal message={errorDetail} onClose={() => setErrorDetail(null)} />
-      ) : null}
+      {errorDetail ? <SaveErrorModal message={errorDetail} onClose={closeError} /> : null}
     </>
   );
 }
 
 function QuickCaptureField({
-  mode,
-  text,
-  url,
-  title,
+  draft,
   disabled,
-  setText,
-  setUrl,
-  setTitle,
+  onDraftChange,
 }: {
-  mode: CaptureMode;
-  text: string;
-  url: string;
-  title: string;
+  draft: CaptureDraft;
   disabled: boolean;
-  setText: (value: string) => void;
-  setUrl: (value: string) => void;
-  setTitle: (value: string) => void;
+  onDraftChange: DraftUpdate;
 }) {
   return (
     <label className="quick-field">
@@ -120,18 +112,18 @@ function QuickCaptureField({
         aria-label="New item title"
         disabled={disabled}
         name="quick-title"
-        onChange={(event) => setTitle(event.currentTarget.value)}
+        onChange={(event) => onDraftChange({ title: event.currentTarget.value })}
         placeholder="Title"
-        value={title}
+        value={draft.title}
       />
-      {mode === "text" ? (
+      {draft.mode === "text" ? (
         <textarea
           aria-label="New text item"
           disabled={disabled}
           name="quick-text"
-          onChange={(event) => setText(event.currentTarget.value)}
+          onChange={(event) => onDraftChange({ text: event.currentTarget.value })}
           rows={5}
-          value={text}
+          value={draft.text}
         />
       ) : (
         <div className="quick-link-fields">
@@ -139,10 +131,10 @@ function QuickCaptureField({
             aria-label="New link URL"
             disabled={disabled}
             name="quick-url"
-            onChange={(event) => setUrl(event.currentTarget.value)}
+            onChange={(event) => onDraftChange({ url: event.currentTarget.value })}
             placeholder="URL"
             type="url"
-            value={url}
+            value={draft.url}
           />
         </div>
       )}
@@ -152,18 +144,16 @@ function QuickCaptureField({
 
 function QuickTagSelector({
   popularTags,
-  selectedTags,
-  tagInput,
+  draft,
   disabled,
   onToggleTag,
-  onTagInputChange,
+  onDraftChange,
 }: {
   popularTags: TagCorpusEntry[];
-  selectedTags: string[];
-  tagInput: string;
+  draft: CaptureDraft;
   disabled: boolean;
   onToggleTag: (tag: string) => void;
-  onTagInputChange: (value: string) => void;
+  onDraftChange: DraftUpdate;
 }) {
   return (
     <div aria-label="New item tags" className="quick-tags">
@@ -171,9 +161,9 @@ function QuickTagSelector({
         <div className="quick-tag-chips">
           {popularTags.map((tag) => (
             <button
-              aria-pressed={selectedTags.includes(tag.display_name)}
+              aria-pressed={draft.selectedTags.includes(tag.display_name)}
               className={
-                selectedTags.includes(tag.display_name)
+                draft.selectedTags.includes(tag.display_name)
                   ? "quick-tag-chip selected"
                   : "quick-tag-chip"
               }
@@ -192,67 +182,77 @@ function QuickTagSelector({
         <input
           disabled={disabled}
           name="quick-tags"
-          onChange={(event) => onTagInputChange(event.currentTarget.value)}
-          value={tagInput}
+          onChange={(event) => onDraftChange({ tagInput: event.currentTarget.value })}
+          value={draft.tagInput}
         />
       </label>
     </div>
   );
 }
 
+function useCaptureDraft() {
+  const [value, setValue] = useState<CaptureDraft>(emptyDraft);
+  const update = useCallback<DraftUpdate>((patch) => {
+    setValue((current) => ({ ...current, ...patch }));
+  }, []);
+  const toggleSelectedTag = useCallback((tag: string) => {
+    setValue((current) => ({ ...current, selectedTags: toggleTag(current.selectedTags, tag) }));
+  }, []);
+  const clearSavedDraft = useCallback((mode: CaptureMode) => {
+    setValue((current) => ({
+      ...current,
+      selectedTags: [],
+      tagInput: "",
+      text: mode === "text" ? "" : current.text,
+      title: "",
+      url: mode === "link" ? "" : current.url,
+    }));
+  }, []);
+  return {
+    clearSavedDraft,
+    toggleTag: toggleSelectedTag,
+    update,
+    value,
+  };
+}
+
 async function saveCapture(options: {
-  mode: CaptureMode;
-  text: string;
-  url: string;
-  title: string;
-  tagInput: string;
-  selectedTags: string[];
-  onCreateText: (request: CaptureTextRequest) => Promise<CaptureItemOutcome>;
-  onCreateLink: (request: CaptureLinkRequest) => Promise<CaptureItemOutcome>;
-  setText: (value: string) => void;
-  setUrl: (value: string) => void;
-  setTitle: (value: string) => void;
-  setTagInput: (value: string) => void;
-  setSelectedTags: (tags: string[]) => void;
-  setSaving: (saving: boolean) => void;
-  setMessage: (message: SaveState) => void;
-  setErrorDetail: (message: string | null) => void;
+  clearDraft: (mode: CaptureMode) => void;
+  commands: CaptureCommands;
+  draft: CaptureDraft;
+  feedback: {
+    setErrorDetail: (message: string | null) => void;
+    setMessage: (message: SaveState) => void;
+    setSaving: (saving: boolean) => void;
+  };
 }) {
-  if (!canSaveDraft(options.mode, options.text, options.url)) {
-    options.setMessage({ kind: "error", text: emptyDraftMessage(options.mode) });
+  const { clearDraft, commands, draft, feedback } = options;
+  if (!canSaveDraft(draft)) {
+    feedback.setMessage({ kind: "error", text: emptyDraftMessage(draft.mode) });
     return;
   }
-  options.setSaving(true);
-  options.setMessage({ kind: "idle", text: "Saving" });
-  options.setErrorDetail(null);
+  feedback.setSaving(true);
+  feedback.setMessage({ kind: "idle", text: "Saving" });
+  feedback.setErrorDetail(null);
   try {
-    const outcome = await createCapture(options);
-    clearDraft(options);
-    options.setMessage({ kind: "success", text: outcome.created ? "Saved" : "Already saved" });
+    const outcome = await createCapture(draft, commands);
+    clearDraft(draft.mode);
+    feedback.setMessage({ kind: "success", text: outcome.created ? "Saved" : "Already saved" });
   } catch (error) {
     const errorMessage = saveErrorMessage(error);
-    options.setMessage({ kind: "error", text: "Save failed" });
-    options.setErrorDetail(errorMessage);
+    feedback.setMessage({ kind: "error", text: "Save failed" });
+    feedback.setErrorDetail(errorMessage);
   } finally {
-    options.setSaving(false);
+    feedback.setSaving(false);
   }
 }
 
-async function createCapture(options: {
-  mode: CaptureMode;
-  text: string;
-  url: string;
-  title: string;
-  tagInput: string;
-  selectedTags: string[];
-  onCreateText: (request: CaptureTextRequest) => Promise<CaptureItemOutcome>;
-  onCreateLink: (request: CaptureLinkRequest) => Promise<CaptureItemOutcome>;
-}) {
-  const tags = selectedTagValues(options.selectedTags, options.tagInput);
-  if (options.mode === "text") {
-    return options.onCreateText(await textRequest(options.text, options.title, tags));
+async function createCapture(draft: CaptureDraft, commands: CaptureCommands) {
+  const tags = selectedTagValues(draft);
+  if (draft.mode === "text") {
+    return commands.createText(await textRequest(draft.text, draft.title, tags));
   }
-  return options.onCreateLink(linkRequest(options.url.trim(), options.title, tags));
+  return commands.createLink(linkRequest(draft.url.trim(), draft.title, tags));
 }
 
 function saveErrorMessage(error: unknown) {
@@ -290,16 +290,16 @@ function optionalString(value: string) {
   return value.trim() || null;
 }
 
-function canSaveDraft(mode: CaptureMode, text: string, url: string) {
-  return mode === "text" ? text.trim().length > 0 : url.trim().length > 0;
+function canSaveDraft(draft: CaptureDraft) {
+  return draft.mode === "text" ? draft.text.trim().length > 0 : draft.url.trim().length > 0;
 }
 
 function emptyDraftMessage(mode: CaptureMode) {
   return mode === "text" ? "Enter text" : "Enter link";
 }
 
-function selectedTagValues(selectedTags: string[], tagInput: string) {
-  return dedupeTags([...selectedTags, ...tagInput.split(",")]);
+function selectedTagValues(draft: CaptureDraft) {
+  return dedupeTags([...draft.selectedTags, ...draft.tagInput.split(",")]);
 }
 
 function dedupeTags(tags: string[]) {
@@ -319,24 +319,6 @@ function toggleTag(selectedTags: string[], tag: string) {
   return selectedTags.includes(tag)
     ? selectedTags.filter((selected) => selected !== tag)
     : [...selectedTags, tag];
-}
-
-function clearDraft(options: {
-  mode: CaptureMode;
-  setText: (value: string) => void;
-  setUrl: (value: string) => void;
-  setTitle: (value: string) => void;
-  setTagInput: (value: string) => void;
-  setSelectedTags: (tags: string[]) => void;
-}) {
-  if (options.mode === "text") {
-    options.setText("");
-  } else {
-    options.setUrl("");
-  }
-  options.setTitle("");
-  options.setTagInput("");
-  options.setSelectedTags([]);
 }
 
 function randomId() {

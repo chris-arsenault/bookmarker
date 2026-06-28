@@ -1,17 +1,12 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { ImageItemDetail } from "./ImageDetail";
 import { ItemOrganizer } from "./ItemOrganizer";
 import { itemCopyLabel, itemFetchedTitle, itemSourceUrl } from "./itemDisplay";
-import type {
-  ImageAccessTarget,
-  LibraryItemDetail,
-  LibraryItemSummary,
-  TagCorpusEntry,
-  UpdateItemRequest,
-} from "./types";
+import { useLibraryActions } from "./LibraryActionsContext";
+import type { LibraryItemDetail, LibraryItemSummary, TagCorpusEntry } from "./types";
 
 const markdownPlugins = [remarkGfm, remarkBreaks];
 
@@ -19,21 +14,12 @@ export function ItemDetail({
   detail,
   availableTags,
   onClose,
-  onCopyLink,
-  onOpenSource,
-  onLoadImageAccess,
-  onUpdateItem,
-  onDeleteItem,
 }: {
   detail: LibraryItemDetail | null;
   availableTags: TagCorpusEntry[];
   onClose: () => void;
-  onCopyLink: (item: LibraryItemDetail["summary"]) => void;
-  onOpenSource: (url: string) => void;
-  onLoadImageAccess?: (itemId: string) => Promise<ImageAccessTarget>;
-  onUpdateItem: (itemId: string, request: UpdateItemRequest) => Promise<LibraryItemDetail>;
-  onDeleteItem?: (itemId: string) => Promise<void>;
 }) {
+  const { updateItem } = useLibraryActions();
   if (!detail) {
     return null;
   }
@@ -56,21 +42,10 @@ export function ItemDetail({
           detail={detail}
           density={isTextSnippet ? "compact" : "default"}
           key={summary.id}
-          onUpdateItem={onUpdateItem}
+          onUpdateItem={updateItem}
         />
-        <DetailPrimary
-          detail={detail}
-          onLoadImageAccess={onLoadImageAccess}
-          sourceUrl={sourceUrl}
-        />
-        <DetailActions
-          detail={detail}
-          onClose={onClose}
-          onCopyLink={onCopyLink}
-          onDeleteItem={onDeleteItem}
-          onOpenSource={onOpenSource}
-          sourceUrl={sourceUrl}
-        />
+        <DetailPrimary detail={detail} sourceUrl={sourceUrl} />
+        <DetailActions detail={detail} onClose={onClose} sourceUrl={sourceUrl} />
       </aside>
     </div>
   );
@@ -79,18 +54,16 @@ export function ItemDetail({
 function DetailPrimary({
   detail,
   sourceUrl,
-  onLoadImageAccess,
 }: {
   detail: LibraryItemDetail;
   sourceUrl: string | null;
-  onLoadImageAccess?: (itemId: string) => Promise<ImageAccessTarget>;
 }) {
   const { summary } = detail;
   if (summary.text) {
     return <TextSnippetDetail detail={detail} />;
   }
   if (summary.image) {
-    return <ImageItemDetail detail={detail} onLoadImageAccess={onLoadImageAccess} />;
+    return <ImageItemDetail detail={detail} />;
   }
   return <LinkDetailHeading sourceUrl={sourceUrl} summary={summary} />;
 }
@@ -133,33 +106,28 @@ function DetailActions({
   detail,
   sourceUrl,
   onClose,
-  onCopyLink,
-  onOpenSource,
-  onDeleteItem,
 }: {
   detail: LibraryItemDetail;
   sourceUrl: string | null;
   onClose: () => void;
-  onCopyLink: (item: LibraryItemDetail["summary"]) => void;
-  onOpenSource: (url: string) => void;
-  onDeleteItem?: (itemId: string) => Promise<void>;
 }) {
+  const { copyItem, deleteItem: removeItem, openSource } = useLibraryActions();
   const { summary } = detail;
   return (
     <div className="detail-actions">
       {sourceUrl ? (
-        <button className="primary-action" onClick={() => onOpenSource(sourceUrl)} type="button">
+        <button className="primary-action" onClick={() => openSource(sourceUrl)} type="button">
           Open source
         </button>
       ) : null}
-      <button className="secondary-action" onClick={() => onCopyLink(summary)} type="button">
+      <button className="secondary-action" onClick={() => copyItem(summary)} type="button">
         {itemCopyLabel(summary)}
       </button>
       <DeleteButton
         itemId={summary.id}
         key={summary.id}
         onDeleted={onClose}
-        onDeleteItem={onDeleteItem}
+        onDeleteItem={removeItem}
       />
     </div>
   );
@@ -172,14 +140,15 @@ function DeleteButton({
 }: {
   itemId: string;
   onDeleted: () => void;
-  onDeleteItem?: (itemId: string) => Promise<void>;
+  onDeleteItem: (itemId: string) => Promise<void>;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  if (!onDeleteItem) {
-    return null;
-  }
+  const cancelDelete = useCallback(() => setConfirming(false), []);
+  const confirmDelete = useCallback(() => {
+    deleteItem(itemId, onDeleteItem, onDeleted, setDeleting, setDeleteError).catch(() => {});
+  }, [itemId, onDeleteItem, onDeleted]);
   return (
     <>
       <button
@@ -197,12 +166,8 @@ function DeleteButton({
         <DeleteConfirmModal
           deleting={deleting}
           error={deleteError}
-          onCancel={() => setConfirming(false)}
-          onConfirm={() => {
-            deleteItem(itemId, onDeleteItem, onDeleted, setDeleting, setDeleteError).catch(
-              () => {}
-            );
-          }}
+          onCancel={cancelDelete}
+          onConfirm={confirmDelete}
         />
       ) : null}
     </>

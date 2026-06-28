@@ -1,9 +1,12 @@
 // @vitest-environment happy-dom
 
-import { act } from "react";
+import { act, useCallback, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ImageAccessProvider } from "./ImageAccessProvider";
 import { ItemDetail } from "./ItemDetail";
+import type { LibraryActions } from "./LibraryActionsContext";
+import { LibraryActionsProvider } from "./LibraryActionsProvider";
 import type {
   ArchiveStatus,
   ImageAccessTarget,
@@ -12,6 +15,9 @@ import type {
 } from "./types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const noTags: [] = [];
+const closeNoop = () => undefined;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -78,20 +84,41 @@ describe("ItemDetail images", () => {
 });
 
 function imageDetailView(detail: LibraryItemDetail, loaded: string[]) {
-  return (
-    <ItemDetail
-      availableTags={[]}
-      detail={detail}
-      onClose={() => undefined}
-      onCopyLink={() => undefined}
-      onLoadImageAccess={async (itemId) => {
-        loaded.push(itemId);
-        return imageAccessTarget();
-      }}
-      onOpenSource={() => undefined}
-      onUpdateItem={async () => detail}
-    />
+  return <ImageDetailHarness detail={detail} loaded={loaded} />;
+}
+
+function ImageDetailHarness({ detail, loaded }: { detail: LibraryItemDetail; loaded: string[] }) {
+  const actions = useMemo(() => detailActions(detail), [detail]);
+  const loadImageAccess = useCallback(
+    async (itemId: string) => {
+      loaded.push(itemId);
+      return imageAccessTarget();
+    },
+    [loaded]
   );
+  return (
+    <LibraryActionsProvider actions={actions}>
+      <ImageAccessProvider loadImageAccess={loadImageAccess}>
+        <ItemDetail availableTags={noTags} detail={detail} onClose={closeNoop} />
+      </ImageAccessProvider>
+    </LibraryActionsProvider>
+  );
+}
+
+function detailActions(detail: LibraryItemDetail): LibraryActions {
+  return {
+    changeFilters: () => undefined,
+    closeDetail: () => undefined,
+    copyItem: () => undefined,
+    createLink: async () => ({ created: true, item: detail }),
+    createText: async () => ({ created: true, item: detail }),
+    deleteItem: async () => undefined,
+    mergeTags: async () => [],
+    openSource: () => undefined,
+    renameTag: async () => [],
+    selectItem: () => undefined,
+    updateItem: async () => detail,
+  };
 }
 
 function imageDetail(

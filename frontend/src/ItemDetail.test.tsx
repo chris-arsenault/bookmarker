@@ -4,9 +4,14 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ItemDetail } from "./ItemDetail";
+import type { LibraryActions } from "./LibraryActionsContext";
+import { LibraryActionsProvider } from "./LibraryActionsProvider";
 import type { LibraryItemDetail } from "./types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const noTags: [] = [];
+const closeNoop = () => undefined;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -28,17 +33,11 @@ describe("ItemDetail delete confirmation", () => {
 
     await act(async () => {
       root.render(
-        <ItemDetail
-          availableTags={[]}
-          detail={itemDetail}
-          onClose={() => undefined}
-          onCopyLink={() => undefined}
-          onDeleteItem={async (itemId) => {
+        detailView(itemDetail, {
+          deleteItem: async (itemId) => {
             deletedItems.push(itemId);
-          }}
-          onOpenSource={() => undefined}
-          onUpdateItem={async () => itemDetail}
-        />
+          },
+        })
       );
     });
 
@@ -76,17 +75,7 @@ describe("ItemDetail link deletion state", () => {
     );
 
     await act(async () => {
-      root.render(
-        <ItemDetail
-          availableTags={[]}
-          detail={linkDetail("link-1")}
-          onClose={() => undefined}
-          onCopyLink={() => undefined}
-          onDeleteItem={onDeleteItem}
-          onOpenSource={() => undefined}
-          onUpdateItem={async () => linkDetail("link-1")}
-        />
-      );
+      root.render(detailView(linkDetail("link-1"), { deleteItem: onDeleteItem }));
     });
     await act(async () => {
       clickButton(container, "Delete item");
@@ -100,17 +89,7 @@ describe("ItemDetail link deletion state", () => {
     expect(findButton(container, "Deleting")?.disabled).toBe(true);
 
     await act(async () => {
-      root.render(
-        <ItemDetail
-          availableTags={[]}
-          detail={linkDetail("link-2")}
-          onClose={() => undefined}
-          onCopyLink={() => undefined}
-          onDeleteItem={onDeleteItem}
-          onOpenSource={() => undefined}
-          onUpdateItem={async () => linkDetail("link-2")}
-        />
-      );
+      root.render(detailView(linkDetail("link-2"), { deleteItem: onDeleteItem }));
     });
 
     const deleteButton = findButton(container, "Delete item");
@@ -130,17 +109,11 @@ describe("ItemDetail delete cancellation", () => {
 
     await act(async () => {
       root.render(
-        <ItemDetail
-          availableTags={[]}
-          detail={itemDetail}
-          onClose={() => undefined}
-          onCopyLink={() => undefined}
-          onDeleteItem={async (itemId) => {
+        detailView(itemDetail, {
+          deleteItem: async (itemId) => {
             deletedItems.push(itemId);
-          }}
-          onOpenSource={() => undefined}
-          onUpdateItem={async () => itemDetail}
-        />
+          },
+        })
       );
     });
 
@@ -165,16 +138,7 @@ describe("ItemDetail text snippets", () => {
     const root = createRoot(container);
 
     await act(async () => {
-      root.render(
-        <ItemDetail
-          availableTags={[]}
-          detail={longSnippetDetail}
-          onClose={() => undefined}
-          onCopyLink={() => undefined}
-          onOpenSource={() => undefined}
-          onUpdateItem={async () => longSnippetDetail}
-        />
-      );
+      root.render(detailView(longSnippetDetail));
     });
 
     expect(container.querySelector("#detail-title")?.textContent).toBe("Terminal note");
@@ -200,16 +164,7 @@ describe("ItemDetail link heading", () => {
     const root = createRoot(container);
 
     await act(async () => {
-      root.render(
-        <ItemDetail
-          availableTags={[]}
-          detail={detail}
-          onClose={() => undefined}
-          onCopyLink={() => undefined}
-          onOpenSource={() => undefined}
-          onUpdateItem={async () => detail}
-        />
-      );
+      root.render(detailView(detail));
     });
 
     expect(container.querySelector(".thumbnail")).toBeNull();
@@ -220,6 +175,34 @@ describe("ItemDetail link heading", () => {
     container.remove();
   });
 });
+
+function detailView(detail: LibraryItemDetail, actions: Partial<LibraryActions> = {}) {
+  return (
+    <LibraryActionsProvider actions={detailActions(detail, actions)}>
+      <ItemDetail availableTags={noTags} detail={detail} onClose={closeNoop} />
+    </LibraryActionsProvider>
+  );
+}
+
+function detailActions(
+  detail: LibraryItemDetail,
+  overrides: Partial<LibraryActions>
+): LibraryActions {
+  return {
+    changeFilters: () => undefined,
+    closeDetail: () => undefined,
+    copyItem: () => undefined,
+    createLink: async () => ({ created: true, item: detail }),
+    createText: async () => ({ created: true, item: detail }),
+    deleteItem: async () => undefined,
+    mergeTags: async () => [],
+    openSource: () => undefined,
+    renameTag: async () => [],
+    selectItem: () => undefined,
+    updateItem: async () => detail,
+    ...overrides,
+  };
+}
 
 const itemDetail: LibraryItemDetail = {
   summary: {
