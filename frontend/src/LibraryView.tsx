@@ -25,6 +25,7 @@ type LibraryViewProps = {
   filters: LibraryFilters;
   thumbnailUrls: Record<string, string>;
   onSelectItem: (itemId: string) => void;
+  onCloseDetail: () => void;
   onFiltersChange: (filters: LibraryFilters) => void;
   onCopyLink: (item: LibraryItemSummary) => void;
   onOpenSource: (url: string) => void;
@@ -49,26 +50,16 @@ export function LibraryView(props: LibraryViewProps) {
   return <ReadyLibraryView {...props} viewModel={viewModel} />;
 }
 
-function ReadyLibraryView({
-  filters,
-  thumbnailUrls,
-  viewModel,
-  onSelectItem,
-  onFiltersChange,
-  onCopyLink,
-  onOpenSource,
-  onLoadImage,
-  onUpdateItem,
-  onCreateText,
-  onCreateLink,
-  onDeleteItem,
-  onRenameTag,
-  onMergeTags,
-}: ReadyLibraryViewProps) {
-  const detailModal = useDetailModal(viewModel.selectedDetail, onSelectItem);
+function ReadyLibraryView(props: ReadyLibraryViewProps) {
+  const { filters, viewModel } = props;
+  const detailModal = useDetailModal(
+    viewModel.selectedDetail,
+    props.onSelectItem,
+    props.onCloseDetail
+  );
   const changeFilters = (nextFilters: LibraryFilters) => {
     detailModal.close();
-    onFiltersChange(nextFilters);
+    props.onFiltersChange(nextFilters);
   };
 
   return (
@@ -81,8 +72,8 @@ function ReadyLibraryView({
       >
         <RailCapture
           tags={viewModel.tags}
-          onCreateLink={onCreateLink}
-          onCreateText={onCreateText}
+          onCreateLink={props.onCreateLink}
+          onCreateText={props.onCreateText}
         />
       </VaultRail>
       <main className="workspace">
@@ -97,16 +88,16 @@ function ReadyLibraryView({
               activeFilters={activeFilterCount(filters)}
               filters={filters}
               onFiltersChange={changeFilters}
-              onMergeTags={onMergeTags}
-              onRenameTag={onRenameTag}
+              onMergeTags={props.onMergeTags}
+              onRenameTag={props.onRenameTag}
               platforms={platformOptions(viewModel.items)}
               tags={tagOptions(viewModel.tags)}
               tagCorpus={viewModel.tags}
             />
             <FeedPanel
-              thumbnailUrls={thumbnailUrls}
+              thumbnailUrls={props.thumbnailUrls}
               viewModel={viewModel}
-              onCopyLink={onCopyLink}
+              onCopyLink={props.onCopyLink}
               onSelectItem={detailModal.open}
             />
           </div>
@@ -114,11 +105,11 @@ function ReadyLibraryView({
             availableTags={viewModel.tags}
             detail={detailModal.detail}
             onClose={detailModal.close}
-            onCopyLink={onCopyLink}
-            onDeleteItem={onDeleteItem}
-            onLoadImage={onLoadImage}
-            onOpenSource={onOpenSource}
-            onUpdateItem={onUpdateItem}
+            onCopyLink={props.onCopyLink}
+            onDeleteItem={props.onDeleteItem}
+            onLoadImage={props.onLoadImage}
+            onOpenSource={props.onOpenSource}
+            onUpdateItem={props.onUpdateItem}
           />
         </div>
       </main>
@@ -167,7 +158,8 @@ function FeedPanel({
 
 function useDetailModal(
   selectedDetail: LibraryItemDetail | null,
-  onSelectItem: (itemId: string) => void
+  onSelectItem: (itemId: string) => void,
+  onCloseDetail: () => void
 ) {
   const [modalItemId, setModalItemId] = useState<string | null>(null);
   return {
@@ -176,7 +168,10 @@ function useDetailModal(
       setModalItemId(itemId);
       onSelectItem(itemId);
     },
-    close: () => setModalItemId(null),
+    close: () => {
+      setModalItemId(null);
+      onCloseDetail();
+    },
   };
 }
 

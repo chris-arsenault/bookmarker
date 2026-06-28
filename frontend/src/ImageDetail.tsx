@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { LibraryItemDetail, LibraryItemSummary } from "./types";
+import type { ImageUploadStatus, LibraryItemDetail, LibraryItemSummary } from "./types";
 
 type ImageObjectState = {
   itemId: string;
@@ -16,13 +16,20 @@ export function ImageItemDetail({
 }) {
   const { summary } = detail;
   const image = summary.image;
-  const imageUrl = useImageObjectUrl(summary.id, onLoadImage);
+  const imageUrl = useImageObjectUrl(
+    summary.id,
+    image?.upload_status === "uploaded" ? onLoadImage : undefined
+  );
   if (!image) {
     return null;
   }
   return (
     <section className="image-detail-summary" aria-label="Saved image">
-      <ImagePreview imageUrl={imageUrl.url} status={imageUrl.status} />
+      <ImagePreview
+        imageUrl={imageUrl.url}
+        status={imageUrl.status}
+        uploadStatus={image.upload_status}
+      />
       {imageUrl.url ? (
         <a
           className="secondary-action image-download"
@@ -39,12 +46,20 @@ export function ImageItemDetail({
 function ImagePreview({
   imageUrl,
   status,
+  uploadStatus,
 }: {
   imageUrl: string | null;
   status: ImageObjectState["status"];
+  uploadStatus: ImageUploadStatus;
 }) {
   if (imageUrl) {
     return <img alt="" className="image-detail-preview" src={imageUrl} />;
+  }
+  if (uploadStatus === "pending") {
+    return <div className="image-detail-placeholder">Image upload pending</div>;
+  }
+  if (uploadStatus === "failed") {
+    return <div className="image-detail-placeholder">Image upload failed</div>;
   }
   return (
     <div className="image-detail-placeholder">

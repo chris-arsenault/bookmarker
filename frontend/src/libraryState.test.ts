@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyUpdatedItemSummary,
+  clearSelectedItem,
   createLibraryViewModel,
   replaceSelectedDetail,
   replaceTagCorpus,
@@ -57,6 +58,25 @@ describe("library state", () => {
     expect(state.selectedDetail?.summary.inbox_status).toBe("organized");
     expect(state.items[0].watch_status).toBe("watched");
     expect(state.tags[0].display_name).toBe("Research");
+  });
+
+  it("library_state_clears_selected_detail_after_modal_close", () => {
+    const selected = item("saved-item", "succeeded");
+    const state = clearSelectedItem({
+      status: "ready",
+      items: [selected],
+      tags: [tag("Learning")],
+      selectedItemId: selected.id,
+      selectedDetail: { summary: selected, notes: "open" },
+    });
+
+    expect(state.status).toBe("ready");
+    if (state.status !== "ready") {
+      return;
+    }
+    expect(state.selectedItemId).toBeNull();
+    expect(state.selectedDetail).toBeNull();
+    expect(createLibraryViewModel(state).selectedItem).toBeNull();
   });
 });
 

@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ItemDetail } from "./ItemDetail";
-import type { LibraryItemDetail } from "./types";
+import type { ArchiveStatus, ImageUploadStatus, LibraryItemDetail } from "./types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -262,6 +262,37 @@ describe("ItemDetail images", () => {
     URL.createObjectURL = originalCreateObjectUrl;
     URL.revokeObjectURL = originalRevokeObjectUrl;
   });
+
+  it("does_not_fetch_image_bytes_while_upload_is_pending", async () => {
+    const loaded: string[] = [];
+    const detail = imageDetail("pending", "pending");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <ItemDetail
+          availableTags={[]}
+          detail={detail}
+          onClose={() => undefined}
+          onCopyLink={() => undefined}
+          onLoadImage={async (itemId) => {
+            loaded.push(itemId);
+            return new Blob(["image"], { type: "image/jpeg" });
+          }}
+          onOpenSource={() => undefined}
+          onUpdateItem={async () => detail}
+        />
+      );
+      await Promise.resolve();
+    });
+
+    expect(loaded).toEqual([]);
+    expect(container.textContent).toContain("Image upload pending");
+    root.unmount();
+    container.remove();
+  });
 });
 
 const itemDetail: LibraryItemDetail = {
@@ -336,7 +367,10 @@ function linkDetail(id: string): LibraryItemDetail {
   };
 }
 
-function imageDetail(): LibraryItemDetail {
+function imageDetail(
+  uploadStatus: ImageUploadStatus = "uploaded",
+  archiveStatus: ArchiveStatus = "succeeded"
+): LibraryItemDetail {
   return {
     ...itemDetail,
     summary: {
@@ -350,13 +384,13 @@ function imageDetail(): LibraryItemDetail {
         content_type: "image/jpeg",
         original_filename: "phone.jpg",
         byte_size: 2048,
-        upload_status: "uploaded",
+        upload_status: uploadStatus,
         source_app: "Android share",
         source_device: "android",
         capture_method: "android_share",
       },
       title: "Phone transfer",
-      archive_status: "succeeded",
+      archive_status: archiveStatus,
     },
   };
 }

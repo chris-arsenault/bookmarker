@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useCallback, type Dispatch, type SetStateAction } from "react";
 import type { ApiClient } from "./api";
 import {
   captureLinkItem,
@@ -13,7 +13,7 @@ import {
 } from "./libraryActions";
 import { LibraryView } from "./LibraryView";
 import type { LibraryFilters } from "./libraryFilters";
-import type { LibraryState } from "./libraryState";
+import { clearSelectedItem, type LibraryState } from "./libraryState";
 
 type LibraryViewShellProps = {
   apiClient: ApiClient;
@@ -36,6 +36,8 @@ export function LibraryViewShell({
   setThumbnailUrls,
   setUpdatesCursor,
 }: LibraryViewShellProps) {
+  const loadImage = useCallback((itemId: string) => apiClient.fetchImage(itemId), [apiClient]);
+
   return (
     <LibraryView
       filters={filters}
@@ -75,8 +77,9 @@ export function LibraryViewShell({
       onSelectItem={(itemId) => {
         selectItem(apiClient, itemId, setLibraryState).catch(() => {});
       }}
+      onCloseDetail={() => setLibraryState(clearSelectedItem)}
       onCopyLink={copyLink}
-      onLoadImage={(itemId) => apiClient.fetchImage(itemId)}
+      onLoadImage={loadImage}
       onOpenSource={openSource}
       onUpdateItem={(itemId, request) =>
         updateItemOrganization(apiClient, itemId, request, setLibraryState)

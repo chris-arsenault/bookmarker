@@ -31,6 +31,7 @@ describe("LibraryView browsing", () => {
         thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
         onFiltersChange={() => undefined}
         onSelectItem={() => undefined}
+        onCloseDetail={() => undefined}
         onCopyLink={() => undefined}
         onOpenSource={() => undefined}
         onUpdateItem={updateItemNoop}
@@ -56,6 +57,7 @@ describe("LibraryView browsing", () => {
         thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
         onFiltersChange={() => undefined}
         onSelectItem={() => undefined}
+        onCloseDetail={() => undefined}
         onCopyLink={() => undefined}
         onOpenSource={() => undefined}
         onUpdateItem={updateItemNoop}
@@ -75,6 +77,43 @@ describe("LibraryView browsing", () => {
 });
 
 describe("LibraryView organizer", () => {
+  it("clears_selected_detail_when_the_detail_modal_closes", async () => {
+    const closeCalls: string[] = [];
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <LibraryView
+          state={libraryState}
+          filters={emptyFilters}
+          thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
+          onFiltersChange={() => undefined}
+          onSelectItem={() => undefined}
+          onCloseDetail={() => closeCalls.push("closed")}
+          onCopyLink={() => undefined}
+          onOpenSource={() => undefined}
+          onUpdateItem={updateItemNoop}
+          onRenameTag={renameTagNoop}
+          onMergeTags={mergeTagsNoop}
+        />
+      );
+    });
+
+    await openFirstItem(container);
+    await act(async () => {
+      findButtonByLabel(container, "Close detail").click();
+    });
+
+    expect(closeCalls).toEqual(["closed"]);
+    expect(container.querySelector(".detail-modal")).toBeNull();
+    root.unmount();
+    container.remove();
+  });
+});
+
+describe("LibraryView organizer", () => {
   it("renders_compact_item_controls_for_notes_tags_watch_and_inbox", async () => {
     const container = document.createElement("div");
     document.body.append(container);
@@ -88,6 +127,7 @@ describe("LibraryView organizer", () => {
           thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
           onFiltersChange={() => undefined}
           onSelectItem={() => undefined}
+          onCloseDetail={() => undefined}
           onCopyLink={() => undefined}
           onOpenSource={() => undefined}
           onUpdateItem={updateItemNoop}
@@ -123,6 +163,7 @@ describe("LibraryView organizer", () => {
           thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
           onFiltersChange={() => undefined}
           onSelectItem={() => undefined}
+          onCloseDetail={() => undefined}
           onCopyLink={() => undefined}
           onOpenSource={() => undefined}
           onUpdateItem={async (_itemId, request) => {
@@ -168,6 +209,7 @@ describe("LibraryView tag management", () => {
           thumbnailUrls={{ "item-1": "/items/item-1/thumbnail" }}
           onFiltersChange={() => undefined}
           onSelectItem={() => undefined}
+          onCloseDetail={() => undefined}
           onCopyLink={() => undefined}
           onOpenSource={() => undefined}
           onUpdateItem={updateItemNoop}
@@ -203,6 +245,7 @@ describe("LibraryView tag management", () => {
         thumbnailUrls={{}}
         onFiltersChange={() => undefined}
         onSelectItem={() => undefined}
+        onCloseDetail={() => undefined}
         onCopyLink={() => undefined}
         onOpenSource={() => undefined}
         onUpdateItem={updateItemNoop}

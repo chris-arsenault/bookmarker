@@ -65,6 +65,17 @@ export function selectLibraryItem(state: LibraryState, itemId: string): LibraryS
   };
 }
 
+export function clearSelectedItem(state: LibraryState): LibraryState {
+  if (state.status !== "ready") {
+    return state;
+  }
+  return {
+    ...state,
+    selectedItemId: null,
+    selectedDetail: null,
+  };
+}
+
 export function replaceSelectedDetail(
   state: LibraryState,
   detail: LibraryItemDetail
@@ -118,6 +129,9 @@ function inactiveViewModel(state: Exclude<LibraryState, { status: "ready" }>): L
 }
 
 function selectedSummary(items: LibraryItemSummary[], selectedItemId: string | null) {
+  if (!selectedItemId) {
+    return null;
+  }
   return items.find((item) => item.id === selectedItemId) ?? items[0] ?? null;
 }
 
