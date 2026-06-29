@@ -3,7 +3,8 @@ use shared::library::{MergeTagsRequest, RenameTagRequest};
 use uuid::Uuid;
 
 use crate::{
-    observe_api_operation, require_user, user_api_operation, ApiResponse, ApiResult, ApiState,
+    observe_api_operation, require_user, short_uuid_ref, user_api_operation, ApiResponse,
+    ApiResult, ApiState,
 };
 
 pub async fn dispatch(
@@ -40,7 +41,7 @@ async fn rename_tag(state: &ApiState, request: &Request, tag_id: Uuid) -> ApiRes
     let user = require_user(state, request.headers()).await?;
     let rename = json_body::<RenameTagRequest>(request)?;
     let operation =
-        user_api_operation("api.tags.rename", &user).with_detail("tag.id", tag_id.to_string());
+        user_api_operation("api.tags.rename", &user).with_detail("tag.ref", short_uuid_ref(tag_id));
     observe_api_operation(operation, async {
         json_response(
             StatusCode::OK,
@@ -59,8 +60,8 @@ async fn merge_tags(
     let user = require_user(state, request.headers()).await?;
     let merge = json_body::<MergeTagsRequest>(request)?;
     let operation = user_api_operation("api.tags.merge", &user)
-        .with_detail("tag.source_id", source_tag_id.to_string())
-        .with_detail("tag.target_id", merge.target_tag_id.to_string());
+        .with_detail("tag.source_ref", short_uuid_ref(source_tag_id))
+        .with_detail("tag.target_ref", short_uuid_ref(merge.target_tag_id));
     observe_api_operation(operation, async {
         json_response(
             StatusCode::OK,

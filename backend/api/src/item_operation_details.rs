@@ -2,11 +2,12 @@ use ahara_lambda_telemetry::{Operation, OperationKind};
 use shared::auth::UserContext;
 use shared::library::{
     CaptureImageUploadRequest, CaptureItemRequest, CaptureTextRequest, ItemImageSummary,
-    ListItemUpdatesQuery, ListItemsQuery, UpdateItemRequest,
+    LibraryItemSummary, ListItemUpdatesQuery, ListItemsQuery, UpdateItemRequest,
 };
+use url::Url;
 use uuid::Uuid;
 
-use crate::{api_operation, user_api_operation};
+use crate::{api_operation, short_uuid_ref, user_api_operation};
 
 pub(crate) fn capture_image_upload_operation(
     user: &UserContext,
@@ -15,11 +16,15 @@ pub(crate) fn capture_image_upload_operation(
     capture_source_details(
         user_api_operation("api.items.capture_image_upload", user)
             .with_detail("item.kind", "image")
+            .with_optional_detail("item.title", title_detail(request.title.as_ref()))
             .with_detail("image.content_type", request.content_type.clone())
             .with_optional_detail("image.byte_size", request.byte_size)
-            .with_detail(
-                "image.original_filename.present",
-                request.original_filename.is_some(),
+            .with_optional_detail(
+                "image.original_filename",
+                request
+                    .original_filename
+                    .as_ref()
+                    .and_then(|value| title_detail(Some(value))),
             )
             .with_detail("capture.title.present", request.title.is_some())
             .with_detail("capture.tag_count", request.tags.len() as i64)
@@ -35,12 +40,13 @@ pub(crate) fn capture_image_upload_operation(
 
 pub(crate) fn complete_image_upload_operation(
     user: &UserContext,
-    item_id: Uuid,
-    image: Option<&ItemImageSummary>,
+    summary: &LibraryItemSummary,
 ) -> Operation {
-    let operation = item_operation("api.items.complete_image_upload", user, item_id)
-        .with_detail("item.kind", "image");
-    match image {
+    let operation = item_summary_details(
+        user_api_operation("api.items.complete_image_upload", user),
+        summary,
+    );
+    match summary.image.as_ref() {
         Some(image) => image_details(operation, image),
         None => operation,
     }
@@ -53,6 +59,7 @@ pub(crate) fn capture_text_operation(
     capture_source_details(
         user_api_operation("api.items.capture_text", user)
             .with_detail("item.kind", "text_snippet")
+            .with_optional_detail("item.title", title_detail(request.title.as_ref()))
             .with_detail(
                 "text.length_chars",
                 request.plain_text.chars().count() as i64,
@@ -73,6 +80,8 @@ pub(crate) fn capture_text_operation(
 pub(crate) fn capture_url_operation(user: &UserContext, request: &CaptureItemRequest) -> Operation {
     user_api_operation("api.items.capture_url", user)
         .with_detail("item.kind", "url")
+        .with_optional_detail("item.title", title_detail(request.title.as_ref()))
+        .with_optional_detail("url.host", url_host(&request.url))
         .with_detail("capture.title.present", request.title.is_some())
         .with_detail("capture.tag_count", request.tags.len() as i64)
         .with_detail(
@@ -84,7 +93,7 @@ pub(crate) fn capture_url_operation(user: &UserContext, request: &CaptureItemReq
 pub(crate) fn dispatch_item_operation(item_id: Uuid) -> Operation {
     api_operation("api.processing.dispatch_item")
         .with_kind(OperationKind::Background)
-        .with_detail("item.id", item_id.to_string())
+        .with_detail("item.ref", short_uuid_ref(item_id))
 }
 
 pub(crate) fn list_items_operation(user: &UserContext, query: &ListItemsQuery) -> Operation {
@@ -127,7 +136,7 @@ pub(crate) fn update_item_operation(
 }
 
 pub(crate) fn item_operation(name: &'static str, user: &UserContext, item_id: Uuid) -> Operation {
-    user_api_operation(name, user).with_detail("item.id", item_id.to_string())
+    user_api_operation(name, user).with_detail("item.ref", short_uuid_ref(item_id))
 }
 
 fn image_details(operation: Operation, image: &ItemImageSummary) -> Operation {
@@ -136,14 +145,47 @@ fn image_details(operation: Operation, image: &ItemImageSummary) -> Operation {
             .with_detail("image.content_type", image.content_type.clone())
             .with_optional_detail("image.byte_size", image.byte_size)
             .with_detail("image.upload_status", image.upload_status.as_str())
-            .with_detail(
-                "image.original_filename.present",
-                image.original_filename.is_some(),
+            .with_optional_detail(
+                "image.original_filename",
+                image
+                    .original_filename
+                    .as_ref()
+                    .and_then(|value| title_detail(Some(value))),
             ),
         image.source_app.as_ref(),
         image.source_device.as_ref(),
         Some(&image.capture_method),
     )
+}
+
+fn item_summary_details(operation: Operation, summary: &LibraryItemSummary) -> Operation {
+    operation
+        .with_detail("item.ref", short_uuid_ref(summary.id))
+        .with_detail("item.kind", summary.item_kind.as_str())
+        .with_optional_detail("item.title", title_detail(summary.title.as_ref()))
+        .with_optional_detail(
+            "metadata.fetched_title",
+            title_detail(summary.fetched_title.as_ref()),
+        )
+        .with_optional_detail(
+            "url.host",
+            summary.url.as_ref().and_then(|url| url_host(&url.copy_url)),
+        )
+        .with_detail("tag.count", summary.tags.len() as i64)
+}
+
+fn title_detail(value: Option<&String>) -> Option<String> {
+    let value = value?.trim();
+    if value.is_empty() {
+        return None;
+    }
+    Some(value.chars().take(120).collect())
+}
+
+fn url_host(value: &str) -> Option<String> {
+    Url::parse(value)
+        .ok()
+        .and_then(|url| url.host_str().map(str::to_string))
 }
 
 fn capture_source_details(

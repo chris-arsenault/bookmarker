@@ -18,6 +18,7 @@ use shared::db::{connect_pool, DbPool};
 use shared::error::{AppError, AppResult};
 use shared::library::LibraryService;
 use shared::library_pg::PgLibraryService;
+use uuid::Uuid;
 
 use http::prelude::*;
 use http::{default_cors, error_response, HttpError, PublicHttpError};
@@ -157,7 +158,19 @@ pub(crate) fn api_operation(name: &'static str) -> Operation {
 pub(crate) fn user_api_operation(name: &'static str, user: &UserContext) -> Operation {
     api_operation(name)
         .with_kind(OperationKind::UserInteraction)
-        .with_detail("enduser.id", user.sub.clone())
+        .with_detail("actor.kind", "authenticated_user")
+        .with_detail("actor.label", user_label(user))
+}
+
+fn user_label(user: &UserContext) -> String {
+    user.username
+        .clone()
+        .or_else(|| user.email.clone())
+        .unwrap_or_else(|| "authenticated-user".to_string())
+}
+
+pub(crate) fn short_uuid_ref(id: Uuid) -> String {
+    id.to_string().chars().take(8).collect()
 }
 
 #[derive(Debug, Clone)]

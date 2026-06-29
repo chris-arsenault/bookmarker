@@ -41,6 +41,7 @@ module "api" {
           authenticated = true
         }
       ]
+      tracing_mode = "Active"
       environment = {
         PROCESSING_FUNCTION_NAME = module.processing.function_name
         SNAPSHOT_BUCKET          = aws_s3_bucket.snapshots.id
@@ -60,6 +61,8 @@ module "processing" {
   memory_size = local.lambda_memory_size.processing
 
   vpc = module.ctx.vpc
+
+  tracing_mode = "Active"
 
   environment = merge(local.common_env, {
     SNAPSHOT_BUCKET = aws_s3_bucket.snapshots.id

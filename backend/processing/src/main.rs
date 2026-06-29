@@ -35,7 +35,7 @@ async fn handler(event: LambdaEvent<ProcessEvent>) -> Result<(), Error> {
     )
     .with_domain("processing")
     .with_kind(OperationKind::Background)
-    .with_detail("item.id", item_id.to_string())
+    .with_detail("item.ref", short_uuid_ref(item_id))
     .observe(async {
         runtime_pipeline()
             .await?
@@ -45,6 +45,10 @@ async fn handler(event: LambdaEvent<ProcessEvent>) -> Result<(), Error> {
     })
     .await?;
     Ok(())
+}
+
+fn short_uuid_ref(id: Uuid) -> String {
+    id.to_string().chars().take(8).collect()
 }
 
 async fn runtime_pipeline() -> Result<

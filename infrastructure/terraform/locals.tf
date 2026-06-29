@@ -22,12 +22,13 @@ locals {
   }
 
   common_env = merge(local.db_env, {
-    API_BASE_URL         = "https://${local.api_hostname}"
-    APP_BASE_URL         = "https://${local.frontend_hostname}"
-    COGNITO_USER_POOL_ID = module.ctx.cognito.user_pool_id
-    COGNITO_CLIENT_ID    = module.cognito_app.client_id
-    COGNITO_DOMAIN       = module.ctx.cognito.domain
-    COGNITO_ISSUER       = module.ctx.cognito.issuer
+    API_BASE_URL           = "https://${local.api_hostname}"
+    APP_BASE_URL           = "https://${local.frontend_hostname}"
+    COGNITO_USER_POOL_ID   = module.ctx.cognito.user_pool_id
+    COGNITO_CLIENT_ID      = module.cognito_app.client_id
+    COGNITO_DOMAIN         = module.ctx.cognito.domain
+    COGNITO_ISSUER         = module.ctx.cognito.issuer
+    DEPLOYMENT_ENVIRONMENT = "production"
   })
 
   alb_priorities = {

@@ -161,7 +161,7 @@ async fn complete_image_upload(
     let user = require_user(state, request.headers()).await?;
     let existing = state.library.get_item(&user, item_id).await?;
     observe_api_operation(
-        complete_image_upload_operation(&user, item_id, existing.summary.image.as_ref()),
+        complete_image_upload_operation(&user, &existing.summary),
         async {
             json_response(
                 StatusCode::OK,
