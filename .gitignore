@@ -16,3 +16,4 @@ android/local.properties
 target/
 coverage/
 .DS_Store
+.sulion-paste/
