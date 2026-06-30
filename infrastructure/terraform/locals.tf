@@ -21,7 +21,14 @@ locals {
     DB_PASSWORD = nonsensitive(data.aws_ssm_parameter.db_password.value)
   }
 
-  common_env = merge(local.db_env, {
+  otel_env = {
+    OTEL_EXPORTER_OTLP_ENDPOINT = nonsensitive(data.aws_ssm_parameter.observability_otlp_http_endpoint.value)
+    OTEL_LOGS_EXPORTER          = "otlp"
+    OTEL_METRICS_EXPORTER       = "otlp"
+    OTEL_TRACES_EXPORTER        = "otlp"
+  }
+
+  common_env = merge(local.db_env, local.otel_env, {
     API_BASE_URL           = "https://${local.api_hostname}"
     APP_BASE_URL           = "https://${local.frontend_hostname}"
     COGNITO_USER_POOL_ID   = module.ctx.cognito.user_pool_id

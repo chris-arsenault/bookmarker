@@ -62,8 +62,6 @@ module "processing" {
 
   vpc = module.ctx.vpc
 
-  tracing_mode = "Active"
-
   environment = merge(local.common_env, {
     SNAPSHOT_BUCKET = aws_s3_bucket.snapshots.id
   })
