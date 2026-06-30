@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "ahara-lambda-telemetry"
 version = "0.1.0"
-source = "git+https://github.com/chris-arsenault/ahara-infra.git#776f084c86040a33c062cd01b1ff25841634cdc1"
+source = "git+https://github.com/chris-arsenault/ahara-infra.git#61c5e2e71a64412c238b9a0daf3221a32ac469dd"
 dependencies = [
  "bytes",
  "lambda_http",
